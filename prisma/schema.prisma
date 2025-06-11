@@ -1,0 +1,365 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model EmailWhitelist {
+  id          String   @id @default(uuid()) @db.Uuid
+  nama        String
+  email       String   @unique
+  isActive    Boolean  @default(true)
+  jabatan     Jabatan
+  role        Role
+  addedBy     String?  @db.Uuid
+  addedByUser Profile? @relation("ProfileToEmailWhitelist", fields: [addedBy], references: [id])
+  addedAt     DateTime @default(now())
+  updatedAt   DateTime @default(now())
+
+  @@index([email])
+  @@index([isActive])
+  @@map("email_whitelist")
+}
+
+model Profile {
+  id                  String  @id @default(uuid()) @db.Uuid
+  userId              String  @unique
+  nama                String
+  jabatan             Jabatan
+  role                Role
+  fotoUrl             String?
+  phone               String?
+  alamat              String?
+  is_profile_complete Boolean @default(false)
+
+  addedWhitelist EmailWhitelist[] @relation("ProfileToEmailWhitelist")
+
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @default(now()) @updatedAt
+  activities UserActivity[]
+  permissions UserPermission[]
+  
+  @@map("profile")
+}
+
+enum Jabatan {
+  DEVELOPER   @map("DEVELOPER")
+  MAINTENANCE @map("MAINTENANCE")
+  PENASEHAT   @map("PENASEHAT")
+  KETUA       @map("KETUA")
+  SEKRETARIS  @map("SEKRETARIS")
+  BENDAHARA   @map("BENDAHARA")
+  KOORDINATOR @map("KOORDINATOR")
+  PENGURUS    @map("PENGURUS")
+
+  @@map("Jabatan")
+}
+
+enum Role {
+  SUPER_ADMIN @map("SUPER_ADMIN")
+  ADMIN       @map("ADMIN")
+  FINANCE     @map("FINANCE")
+  CONTENT     @map("CONTENT")
+  VIEWER      @map("VIEWER")
+  MANAGEMENT  @map("MANAGEMENT")
+  INVENTORY   @map("INVENTORY")
+
+  @@map("Role")
+}
+
+model UserActivity {
+  id        String   @id @default(uuid())
+  profileId String @db.Uuid
+  profile   Profile  @relation(fields: [profileId], references: [id])
+  action    String // LOGIN, LOGOUT, UPDATE_PROFILE, dll
+  details   Json? // Detail tambahan
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+}
+
+model UserPermission {
+  id         String     @id @default(uuid())
+  profileId  String @db.Uuid
+  profile    Profile    @relation(fields: [profileId], references: [id])
+  resource   Resource // Menggunakan enum Resource
+  permission Permission // Menggunakan enum Permission
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  @@unique([profileId, resource, permission])
+}
+
+enum Resource {
+  KEUANGAN
+  MANAJEMEN
+  KONTEN
+  INVENTARIS
+  DASHBOARD
+  ADMIN
+}
+
+enum Permission {
+  READ
+  WRITE
+  DELETE
+  APPROVE
+}
+
+model Donatur {
+  id        Int      @id @default(autoincrement())
+  no        Int
+  nama      String
+  alamat    String
+  tahun     Int
+  jan       Int      @default(0)
+  feb       Int      @default(0)
+  mar       Int      @default(0)
+  apr       Int      @default(0)
+  mei       Int      @default(0)
+  jun       Int      @default(0)
+  jul       Int      @default(0)
+  aug       Int      @default(0)
+  sep       Int      @default(0)
+  okt       Int      @default(0)
+  nov       Int      @default(0)
+  des       Int      @default(0)
+  infaq     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  konten    Konten[]
+  pemasukan Pemasukan[]
+}
+
+model KotakAmal {
+  id        Int      @id @default(autoincrement())
+  no        Int
+  nama      String
+  lokasi    String
+  tahun     Int
+  jan       Int      @default(0)
+  feb       Int      @default(0)
+  mar       Int      @default(0)
+  apr       Int      @default(0)
+  mei       Int      @default(0)
+  jun       Int      @default(0)
+  jul       Int      @default(0)
+  aug       Int      @default(0)
+  sep       Int      @default(0)
+  okt       Int      @default(0)
+  nov       Int      @default(0)
+  des       Int      @default(0)
+  createdAt DateTime @default(now())
+
+  pemasukan Pemasukan[]
+  konten    Konten[]
+}
+
+model KotakAmalMasjid {
+  id        Int      @id @default(autoincrement())
+  tanggal   DateTime
+  jumlah    Int
+  tahun     Int
+  createdAt DateTime @default(now())
+
+  pemasukan Pemasukan[]
+}
+
+model DonasiKhusus {
+  id         Int      @id @default(autoincrement())
+  no         Int
+  nama       String
+  tanggal    DateTime
+  tahun      Int
+  jumlah     Int
+  keterangan String
+  createdAt  DateTime @default(now())
+
+  pemasukan Pemasukan[]
+}
+
+model Pemasukan {
+  id             Int             @id @default(autoincrement())
+  tanggal        DateTime
+  sumber         SumberPemasukan
+  jumlah         Int
+  keterangan     String          @default("")
+  tahun          Int
+  donaturId      Int? // opsional
+  donasiKhususId Int? // opsional
+  kotakAmalId    Int? // opsional
+  kotakMasjidId  Int? // opsional
+  createdAt      DateTime        @default(now())
+
+  donatur      Donatur?         @relation(fields: [donaturId], references: [id])
+  donasiKhusus DonasiKhusus?    @relation(fields: [donasiKhususId], references: [id])
+  kotakAmal    KotakAmal?       @relation(fields: [kotakAmalId], references: [id])
+  kotakMasjid  KotakAmalMasjid? @relation(fields: [kotakMasjidId], references: [id])
+}
+
+enum SumberPemasukan {
+  DONATUR
+  KOTAK_AMAL_LUAR
+  KOTAK_AMAL_MASJID
+  DONASI_KHUSUS
+  LAINNYA
+}
+
+model Pengeluaran {
+  id         Int      @id @default(autoincrement())
+  no         Int
+  tanggal    DateTime
+  nama       String
+  jumlah     Int
+  tahun      Int
+  keterangan String   @default("")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now())
+}
+
+model Pengurus {
+  id        Int      @id @default(autoincrement())
+  no        Int
+  nama      String
+  jabatan   String
+  periode   String
+  fotoUrl   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+}
+
+// Model untuk kategori konten
+model KategoriKonten {
+  id        Int      @id @default(autoincrement())
+  nama      String   @unique
+  label     String
+  slug      String   @unique
+  deskripsi String?
+  warna     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+  konten    Konten[]
+
+  @@map("kategori_konten")
+}
+
+// Model utama untuk konten masjid
+model Konten {
+  id                 Int            @id @default(autoincrement())
+  judul              String
+  slug               String         @unique
+  deskripsi          String
+  tanggal            DateTime
+  waktu              String?
+  lokasi             String?
+  penulis            String?
+  kategoriId         Int
+  donaturId          Int?
+  kotakAmalId        Int?
+  penting            Boolean        @default(false)
+  tampilkanDiBeranda Boolean        @default(true)
+  status             StatusKonten   @default(PUBLISHED)
+  viewCount          Int            @default(0)
+  fotoUrl            String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @default(now())
+  kategori           KategoriKonten @relation(fields: [kategoriId], references: [id])
+  donatur            Donatur?       @relation(fields: [donaturId], references: [id])
+  kotakAmal          KotakAmal?     @relation(fields: [kotakAmalId], references: [id])
+  gambar             GambarKonten[]
+  tags               TagKonten[]
+
+  @@map("konten")
+}
+
+// Model untuk gambar konten
+model GambarKonten {
+  id        Int      @id @default(autoincrement())
+  kontenId  Int
+  url       String
+  filename  String
+  caption   String?
+  urutan    Int      @default(0)
+  isUtama   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+  konten    Konten   @relation(fields: [kontenId], references: [id], onDelete: Cascade)
+
+  @@map("gambar_konten")
+}
+
+// Model untuk tag konten
+model TagKonten {
+  id        Int      @id @default(autoincrement())
+  nama      String   @unique
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+  konten    Konten[]
+
+  @@map("tag_konten")
+}
+
+// Enum untuk status konten
+enum StatusKonten {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+  REVIEWED
+}
+
+// Model untuk konfigurasi website
+model SiteConfig {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now())
+
+  @@map("site_config")
+}
+
+enum KategoriInventaris {
+  PERLENGKAPAN
+  ELEKTRONIK
+  KEBERSIHAN
+  DOKUMEN
+  LAINNYA
+}
+
+enum KondisiInventaris {
+  BAIK
+  CUKUP
+  RUSAK
+}
+
+enum SatuanInventaris {
+  UNIT
+  BUAH
+  LEMBAR
+  SET
+  LAINNYA
+}
+
+model Inventaris {
+  id           Int                @id @default(autoincrement())
+  no           Int
+  namaBarang   String
+  fotoUrl      String?
+  kategori     KategoriInventaris
+  jumlah       Int
+  satuan       SatuanInventaris
+  lokasi       String
+  kondisi      KondisiInventaris
+  tanggalMasuk DateTime
+  tahun        Int
+  keterangan   String?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @default(now())
+}
