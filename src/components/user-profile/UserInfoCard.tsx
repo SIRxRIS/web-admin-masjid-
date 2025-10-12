@@ -206,15 +206,6 @@ export default function UserInfoCard() {
                 {profile.phone || "Belum Diatur"}
               </p>
             </div>
-
-            <div className="lg:col-span-2">
-              <p className="mb-2 text-xs leading-normal text-gray-500 dark:text-gray-400">
-                Bio
-              </p>
-              <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                {profile.bio || "Belum Diatur"}
-              </p>
-            </div>
           </div>
         </div>
 
@@ -299,17 +290,6 @@ export default function UserInfoCard() {
                       type="text"
                       name="phone"
                       placeholder="Masukkan nomor telepon"
-                      className={inputClassName}
-                    />
-                  </div>
-
-                  <div className="col-span-2">
-                    <Label>Bio</Label>
-                    <input
-                      ref={bioRef}
-                      type="text"
-                      name="bio"
-                      placeholder="Ceritakan tentang diri Anda"
                       className={inputClassName}
                     />
                   </div>

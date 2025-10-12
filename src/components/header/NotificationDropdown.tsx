@@ -1,25 +1,140 @@
 "use client";
-import Image from "next/image";
-import Link from "next/link";
-import React, { useState } from "react";
-import { Dropdown } from "../ui/dropdown/Dropdown";
-import { DropdownItem } from "../ui/dropdown/DropdownItem";
 
-// Interface untuk tipe notifikasi
+import Link from "next/link";
+import React, { useState, useEffect } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { Dropdown } from "../ui/dropdown/Dropdown";
+
+// Hindari impor tipe dari @prisma/client di klien.
+// Definisikan union types lokal agar cocok dengan enum di schema Prisma.
+type NotificationType =
+  | "TARGET_PEMASUKAN"
+  | "DONASI_BARU"
+  | "KONTEN_BARU"
+  | "INVENTARIS_BARU"
+  | "SYSTEM_HEALTH"
+  | "EMAIL_WHITELIST"
+  | "GENERAL";
+
+type NotificationPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+
+type Role =
+  | "ADMIN"
+  | "KETUA"
+  | "SEKRETARIS"
+  | "BENDAHARA"
+  | "PENGURUS"
+  | "HUMAS_MEDIA"
+  | "REMAS_ADMIN"
+  | "MAJLIS_TALIM_ADMIN";
+
+// Interface untuk tipe notifikasi yang diperluas
 interface Notification {
   id: string;
+  title: string;
   message: string;
+  type: NotificationType;
+  priority: NotificationPriority;
+  targetRoles: Role[];
+  actionUrl?: string | null;
+  relatedId?: string | null;
+  relatedTable?: string | null;
   isRead: boolean;
-  timestamp: string;
-  user?: {
-    name: string;
-    avatar: string;
-  };
+  readBy: string[];
+  createdBy?: string | null;
+  expiresAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  isReadByUser?: boolean;
 }
 
 export default function NotificationDropdown() {
   const [isOpen, setIsOpen] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>([]); // Array kosong dengan tipe yang jelas
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const { userProfile, loading: authLoading } = useAuth();
+
+  // Load notifications saat komponen mount atau userProfile berubah
+  useEffect(() => {
+    if (userProfile?.role && !authLoading) {
+      loadNotifications();
+      loadUnreadCount();
+    }
+  }, [userProfile, authLoading]);
+
+  // Load notifications berdasarkan role user
+  const loadNotifications = async () => {
+    if (!userProfile?.role || !userProfile?.id) return;
+
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `/api/notifications?role=${encodeURIComponent(
+          userProfile.role as Role
+        )}&userId=${encodeURIComponent(userProfile.id)}`
+      );
+      const result = await res.json();
+      if (result.success) {
+        setNotifications(result.data || []);
+      }
+    } catch (error) {
+      console.error("Error loading notifications:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load jumlah notifikasi yang belum dibaca
+  const loadUnreadCount = async () => {
+    if (!userProfile?.role || !userProfile?.id) return;
+
+    try {
+      const res = await fetch(
+        `/api/notifications/unread-count?role=${encodeURIComponent(
+          userProfile.role as Role
+        )}&userId=${encodeURIComponent(userProfile.id)}`
+      );
+      const result = await res.json();
+      if (result.success) {
+        setUnreadCount(result.data || 0);
+      }
+    } catch (error) {
+      console.error("Error loading unread count:", error);
+    }
+  };
+
+  // Handle klik notifikasi
+  const handleNotificationClick = async (notification: Notification) => {
+    if (!userProfile?.id) return;
+
+    // Tandai sebagai dibaca jika belum dibaca
+    if (!notification.isReadByUser) {
+      try {
+        const res = await fetch(`/api/notifications/mark-read`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ notificationId: notification.id, userId: userProfile.id }),
+        });
+        const result = await res.json();
+        if (result.success) {
+          setNotifications((prev) =>
+            prev.map((n) => (n.id === notification.id ? { ...n, isReadByUser: true } : n))
+          );
+          setUnreadCount((prev) => Math.max(0, prev - 1));
+        }
+      } catch (error) {
+        console.error("Error marking notification as read:", error);
+      }
+    }
+
+    // Redirect ke action URL jika ada
+    if (notification.actionUrl) {
+      window.location.href = notification.actionUrl;
+    }
+
+    closeDropdown();
+  };
 
   function toggleDropdown() {
     setIsOpen(!isOpen);
@@ -33,8 +148,56 @@ export default function NotificationDropdown() {
     toggleDropdown();
   };
 
-  // Cek apakah ada notifikasi yang belum dibaca
-  const hasUnreadNotifications = notifications.some(notification => !notification.isRead);
+  // Fungsi untuk mendapatkan icon berdasarkan tipe notifikasi
+  const getNotificationIcon = (type: NotificationType) => {
+    switch (type) {
+      case "TARGET_PEMASUKAN":
+        return "🎯";
+      case "DONASI_BARU":
+        return "💰";
+      case "KONTEN_BARU":
+        return "📝";
+      case "INVENTARIS_BARU":
+        return "📦";
+      case "SYSTEM_HEALTH":
+        return "⚠️";
+      case "EMAIL_WHITELIST":
+        return "✉️";
+      default:
+        return "🔔";
+    }
+  };
+
+  // Fungsi untuk mendapatkan warna prioritas
+  const getPriorityColor = (priority: NotificationPriority) => {
+    switch (priority) {
+      case "URGENT":
+        return "text-red-600 dark:text-red-400";
+      case "HIGH":
+        return "text-orange-600 dark:text-orange-400";
+      case "MEDIUM":
+        return "text-blue-600 dark:text-blue-400";
+      case "LOW":
+        return "text-gray-600 dark:text-gray-400";
+      default:
+        return "text-gray-600 dark:text-gray-400";
+    }
+  };
+
+  // Fungsi untuk format waktu relatif
+  const formatRelativeTime = (date: string | Date) => {
+    const now = new Date();
+    const diff = now.getTime() - new Date(date).getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (minutes < 1) return "Baru saja";
+    if (minutes < 60) return `${minutes} menit yang lalu`;
+    if (hours < 24) return `${hours} jam yang lalu`;
+    if (days < 7) return `${days} hari yang lalu`;
+    return new Date(date).toLocaleDateString("id-ID");
+  };
 
   return (
     <div className="relative">
@@ -42,13 +205,12 @@ export default function NotificationDropdown() {
         className="relative dropdown-toggle flex items-center justify-center text-gray-500 transition-colors bg-white border border-gray-200 rounded-full hover:text-gray-700 h-11 w-11 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
         onClick={handleClick}
       >
-        {/* Indikator notifikasi hanya muncul jika ada notifikasi yang belum dibaca */}
-        <span
-          className={`absolute right-0 top-0.5 z-10 h-2 w-2 rounded-full bg-orange-400 ${!hasUnreadNotifications ? "hidden" : "flex"
-            }`}
-        >
-          <span className="absolute inline-flex w-full h-full bg-orange-400 rounded-full opacity-75 animate-ping"></span>
-        </span>
+        {/* Indikator notifikasi dengan counter */}
+        {unreadCount > 0 && (
+          <span className="absolute -top-1 -right-1 z-10 flex items-center justify-center min-w-[18px] h-[18px] text-xs font-bold text-white bg-red-500 rounded-full">
+            {unreadCount > 99 ? "99+" : unreadCount}
+          </span>
+        )}
         <svg
           className="fill-current"
           width="20"
@@ -95,20 +257,61 @@ export default function NotificationDropdown() {
         </div>
 
         <div className="flex flex-col h-auto overflow-y-auto custom-scrollbar">
-          {notifications.length > 0 ? (
-            <ul className="flex flex-col">
-              {notifications.map((notification, index) => (
-                <li key={index}>
-                  <DropdownItem
-                    onItemClick={closeDropdown}
-                    className="flex gap-3 rounded-lg border-b border-gray-100 p-3 px-4.5 py-3 hover:bg-gray-100 dark:border-gray-800 dark:hover:bg-white/5"
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          ) : notifications.length > 0 ? (
+            <ul className="flex flex-col space-y-1">
+              {notifications.map((notification) => (
+                <li key={notification.id}>
+                  <button
+                    onClick={() => handleNotificationClick(notification)}
+                    className={`w-full text-left p-3 rounded-lg border-b border-gray-100 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5 transition-colors ${
+                      !notification.isReadByUser ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                    }`}
                   >
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm text-gray-600 dark:text-gray-400">
-                        {notification.message}
-                      </span>
+                    <div className="flex items-start gap-3">
+                      {/* Icon notifikasi */}
+                      <div className="flex-shrink-0 text-lg">
+                        {getNotificationIcon(notification.type)}
+                      </div>
+                      
+                      {/* Konten notifikasi */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <h4 className={`text-sm font-medium truncate ${getPriorityColor(notification.priority)}`}>
+                            {notification.title}
+                          </h4>
+                          {!notification.isReadByUser && (
+                            <div className="flex-shrink-0 w-2 h-2 bg-blue-600 rounded-full"></div>
+                          )}
+                        </div>
+                        
+                        <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2 mb-1">
+                          {notification.message}
+                        </p>
+                        
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-gray-500 dark:text-gray-500">
+                            {formatRelativeTime(notification.createdAt)}
+                          </span>
+                          
+                          {/* Badge prioritas untuk urgent/high */}
+                          {(notification.priority === "URGENT" || 
+                            notification.priority === "HIGH") && (
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                              notification.priority === "URGENT" 
+                                ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                                : 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400'
+                            }`}>
+                              {notification.priority === "URGENT" ? 'Urgent' : 'Penting'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </DropdownItem>
+                  </button>
                 </li>
               ))}
             </ul>

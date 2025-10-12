@@ -1,11 +1,30 @@
 // src/lib/services/supabase/donatur.ts
-import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { DonaturData } from "./schema/donatur/schema";
+import { supabaseAdmin } from "@/lib/supabase/admin";
+import { 
+  DonaturData, 
+  CreateDonaturInput, 
+  UpdateDonaturInput,
+  createDonaturSchema,
+  updateDonaturSchema,
+  donaturFilterSchema
+} from "@/lib/schema/pemasukan/schema";
+import { syncPemasukanForDonatur } from "./pemasukan/sync-helpers";
+
+// Definisikan tipe untuk bulan-bulan
+type MonthKey = 'jan' | 'feb' | 'mar' | 'apr' | 'mei' | 'jun' | 'jul' | 'aug' | 'sep' | 'okt' | 'nov' | 'des';
 
 export async function getDonaturData(
   tahunFilter?: number
 ): Promise<DonaturData[]> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
+
+  // Validasi input filter jika ada
+  if (tahunFilter) {
+    const filterResult = donaturFilterSchema.safeParse({ tahun: tahunFilter });
+    if (!filterResult.success) {
+      throw new Error("Filter tahun tidak valid");
+    }
+  }
 
   let query = supabase
     .from("Donatur")
@@ -27,7 +46,7 @@ export async function getDonaturData(
 }
 
 export async function getAvailableTahun(): Promise<number[]> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
   const { data, error } = await supabase
     .from("Donatur")
@@ -42,10 +61,34 @@ export async function getAvailableTahun(): Promise<number[]> {
   return [...new Set(data.map((item) => item.tahun))];
 }
 
-export async function getDonaturById(
-  id: number
-): Promise<DonaturData | null> {
-  const supabase = await createServerSupabaseClient();
+export async function updateDonaturOrder(donaturData: DonaturData[]) {
+  const supabase = supabaseAdmin;
+
+  const updates = donaturData.map((donatur, index) => ({
+    id: donatur.id,
+    no: index + 1,
+    updatedAt: new Date().toISOString(),
+  }));
+
+  const { error } = await supabase
+    .from("Donatur")
+    .upsert(updates, { onConflict: "id" });
+
+  if (error) {
+    console.error("Error mengupdate urutan donatur:", error);
+    throw new Error("Gagal mengupdate urutan donatur");
+  }
+
+  return true;
+}
+
+export async function getDonaturById(id: number): Promise<DonaturData | null> {
+  const supabase = supabaseAdmin;
+
+  // Validasi input ID
+  if (!id || id <= 0) {
+    throw new Error("ID donatur tidak valid");
+  }
 
   const { data, error } = await supabase
     .from("Donatur")
@@ -54,6 +97,9 @@ export async function getDonaturById(
     .single();
 
   if (error) {
+    if (error.code === 'PGRST116') {
+      return null; // Data tidak ditemukan
+    }
     console.error("Error mengambil data donatur:", error);
     throw new Error("Gagal mengambil data donatur");
   }
@@ -62,15 +108,24 @@ export async function getDonaturById(
 }
 
 export async function createDonatur(
-  donatur: Omit<DonaturData, "id" | "no">
+  donaturInput: CreateDonaturInput
 ): Promise<DonaturData> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
-  // Ambil nomor urut terakhir untuk tahun yang sama
+  // Validasi input menggunakan schema
+  const validationResult = createDonaturSchema.safeParse(donaturInput);
+  if (!validationResult.success) {
+    const errors = validationResult.error.errors.map(e => e.message).join(", ");
+    throw new Error(`Data tidak valid: ${errors}`);
+  }
+
+  const validatedData = validationResult.data;
+
+  // Dapatkan nomor urut berikutnya
   const { data: lastItem, error: lastItemError } = await supabase
     .from("Donatur")
     .select("no")
-    .eq("tahun", donatur.tahun)
+    .eq("tahun", validatedData.tahun)
     .order("no", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -80,24 +135,33 @@ export async function createDonatur(
     throw new Error("Gagal mengambil nomor terakhir");
   }
 
-  // Hitung nomor urut berikutnya
   const nextNo = lastItem ? (lastItem.no || 0) + 1 : 1;
+  const now = new Date().toISOString();
 
-  // Insert data donatur baru dengan nomor urut
   const { data, error } = await supabase
     .from("Donatur")
     .insert([
       {
-        ...donatur,
+        ...validatedData,
         no: nextNo,
+        createdAt: now,
+        updatedAt: now,
       },
     ])
     .select()
     .single();
 
   if (error) {
-    console.error("Error menambahkan donatur:", error);
-    throw new Error("Gagal menambahkan donatur");
+    console.error("Error membuat donatur:", error);
+    throw new Error("Gagal membuat donatur");
+  }
+
+  // AUTO-SYNC: Update tabel Pemasukan
+  try {
+    await syncPemasukanForDonatur(data.id);
+  } catch (syncError) {
+    console.error("Error sync pemasukan setelah create donatur:", syncError);
+    // Tidak throw error agar create tetap berhasil
   }
 
   return data;
@@ -105,110 +169,142 @@ export async function createDonatur(
 
 export async function updateDonatur(
   id: number,
-  donatur: Partial<Omit<DonaturData, "id" | "no">>
+  donaturInput: Omit<UpdateDonaturInput, 'id'>
 ): Promise<DonaturData> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
-  const { data, error } = await supabase
-    .from("Donatur")
-    .update(donatur)
-    .eq("id", id)
-    .select()
-    .single();
+  // Validasi input
+  const validationResult = updateDonaturSchema.safeParse({ id, ...donaturInput });
+  if (!validationResult.success) {
+    const errors = validationResult.error.errors.map(e => e.message).join(", ");
+    throw new Error(`Data tidak valid: ${errors}`);
+  }
 
-  if (error) {
+  const { id: validatedId, ...validatedData } = validationResult.data;
+
+  try {
+    // 1. Dapatkan data donatur sebelum diupdate
+    const { data: oldDonatur, error: getError } = await supabase
+      .from("Donatur")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (getError) {
+      if (getError.code === 'PGRST116') {
+        throw new Error("Donatur tidak ditemukan");
+      }
+      throw getError;
+    }
+
+    // 2. Update donatur
+    const { data: updatedDonatur, error: updateError } = await supabase
+      .from("Donatur")
+      .update({
+        ...validatedData,
+        updatedAt: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
+
+    // AUTO-SYNC: Update tabel Pemasukan
+    try {
+      await syncPemasukanForDonatur(id);
+    } catch (syncError) {
+      console.error("Error sync pemasukan setelah update donatur:", syncError);
+      // Tidak throw error agar update tetap berhasil
+    }
+
+    return updatedDonatur;
+  } catch (error) {
     console.error("Error mengupdate donatur:", error);
     throw new Error("Gagal mengupdate donatur");
   }
-
-  return data;
 }
 
-export async function deleteDonatur(id: number): Promise<void> {
-  const supabase = await createServerSupabaseClient();
+export async function deleteDonatur(id: number): Promise<boolean> {
+  const supabase = supabaseAdmin;
 
-  // Ambil data donatur yang akan dihapus untuk mendapatkan tahun dan no
-  const { data: donaturToDelete, error: getError } = await supabase
-    .from("Donatur")
-    .select("no, tahun")
-    .eq("id", id)
-    .single();
-
-  if (getError) {
-    console.error("Error mengambil data donatur:", getError);
-    throw new Error("Gagal mengambil data donatur");
+  // Validasi input ID
+  if (!id || id <= 0) {
+    throw new Error("ID donatur tidak valid");
   }
-
-  // Hapus donatur
-  const { error: deleteError } = await supabase
-    .from("Donatur")
-    .delete()
-    .eq("id", id);
-
-  if (deleteError) {
-    console.error("Error menghapus donatur:", deleteError);
-    throw new Error("Gagal menghapus donatur");
-  }
-
-  // Update nomor urut untuk donatur lain di tahun yang sama
-  // yang memiliki nomor urut lebih besar dari donatur yang dihapus
-  const { data: remainingDonatur, error: getRemainingError } = await supabase
-    .from("Donatur")
-    .select("id")
-    .eq("tahun", donaturToDelete.tahun)
-    .gt("no", donaturToDelete.no)
-    .order("no", { ascending: true });
-
-  if (getRemainingError) {
-    console.error("Error mengambil data donatur tersisa:", getRemainingError);
-    throw new Error("Gagal mengambil data donatur tersisa");
-  }
-
-  // Update nomor urut secara berurutan
-  if (remainingDonatur && remainingDonatur.length > 0) {
-    for (let i = 0; i < remainingDonatur.length; i++) {
-      const newNo = donaturToDelete.no + i;
-      const { error: updateError } = await supabase
-        .from("Donatur")
-        .update({ no: newNo })
-        .eq("id", remainingDonatur[i].id);
-
-      if (updateError) {
-        console.error("Error mengupdate nomor urut:", updateError);
-        throw new Error("Gagal mengupdate nomor urut");
-      }
-    }
-  }
-}
-
-export async function updateDonaturOrder(
-  donaturData: DonaturData[]
-): Promise<void> {
-  const supabase = await createServerSupabaseClient();
 
   try {
-    // Update urutan donatur satu per satu
-    for (let i = 0; i < donaturData.length; i++) {
-      const { error } = await supabase
-        .from("Donatur")
-        .update({ no: i + 1 })
-        .eq("id", donaturData[i].id);
+    // Cek apakah donatur ada
+    const { data: donaturToDelete, error: getError } = await supabase
+      .from("Donatur")
+      .select("tahun")
+      .eq("id", id)
+      .single();
 
-      if (error) {
-        throw error;
+    if (getError) {
+      if (getError.code === 'PGRST116') {
+        throw new Error("Donatur tidak ditemukan");
       }
+      throw getError;
     }
+
+    // AUTO-SYNC: Hapus data pemasukan terkait terlebih dahulu
+    const { error: deletePemasukanError } = await supabase
+      .from("Pemasukan")
+      .delete()
+      .eq("donaturId", id);
+
+    if (deletePemasukanError) throw deletePemasukanError;
+
+    // Hapus donatur
+    const { error: deleteError } = await supabase
+      .from("Donatur")
+      .delete()
+      .eq("id", id);
+
+    if (deleteError) throw deleteError;
+
+    // Update nomor urut untuk donatur lainnya di tahun yang sama
+    const { data: remainingDonatur, error: getRemainingError } = await supabase
+      .from("Donatur")
+      .select("id, no")
+      .eq("tahun", donaturToDelete.tahun)
+      .order("no", { ascending: true });
+
+    if (getRemainingError) throw getRemainingError;
+
+    if (remainingDonatur && remainingDonatur.length > 0) {
+      const updates = remainingDonatur.map((donatur, index) => ({
+        id: donatur.id,
+        no: index + 1,
+        updatedAt: new Date().toISOString(),
+      }));
+
+      const { error: updateOrderError } = await supabase
+        .from("Donatur")
+        .upsert(updates, { onConflict: "id" });
+
+      if (updateOrderError) throw updateOrderError;
+    }
+
+    return true;
   } catch (error) {
-    console.error("Error mengupdate urutan donatur:", error);
-    throw new Error("Gagal mengupdate urutan donatur");
+    console.error("Error menghapus donatur:", error);
+    throw new Error("Gagal menghapus donatur");
   }
 }
 
-// Fungsi untuk laporan dan statistik
+// Fungsi statistik dan utilitas lainnya
 export async function getDonaturBulanan(
   tahun: number
-): Promise<Record<string, number>> {
-  const supabase = await createServerSupabaseClient();
+): Promise<Record<MonthKey, number>> {
+  const supabase = supabaseAdmin;
+
+  // Validasi tahun
+  const filterResult = donaturFilterSchema.safeParse({ tahun });
+  if (!filterResult.success) {
+    throw new Error("Tahun tidak valid");
+  }
 
   const { data, error } = await supabase
     .from("Donatur")
@@ -220,23 +316,32 @@ export async function getDonaturBulanan(
     throw new Error("Gagal mengambil data donatur bulanan");
   }
 
-  // Hitung total per bulan
-  const totals = {
+  const result: Record<MonthKey, number> = {
     jan: 0, feb: 0, mar: 0, apr: 0, mei: 0, jun: 0,
-    jul: 0, aug: 0, sep: 0, okt: 0, nov: 0, des: 0
+    jul: 0, aug: 0, sep: 0, okt: 0, nov: 0, des: 0,
   };
 
-  data.forEach(donatur => {
-    Object.keys(totals).forEach(month => {
-      totals[month as keyof typeof totals] += donatur[month] || 0;
+  const monthKeys: MonthKey[] = ['jan', 'feb', 'mar', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'des'];
+
+  data?.forEach((item) => {
+    monthKeys.forEach((month) => {
+      if (item[month] !== undefined && item[month] !== null) {
+        result[month] += item[month] || 0;
+      }
     });
   });
 
-  return totals;
+  return result;
 }
 
 export async function getDonaturTahunan(tahun: number): Promise<number> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
+
+  // Validasi tahun
+  const filterResult = donaturFilterSchema.safeParse({ tahun });
+  if (!filterResult.success) {
+    throw new Error("Tahun tidak valid");
+  }
 
   const { data, error } = await supabase
     .from("Donatur")
@@ -248,12 +353,12 @@ export async function getDonaturTahunan(tahun: number): Promise<number> {
     throw new Error("Gagal mengambil data donatur tahunan");
   }
 
-  // Hitung total tahunan
   let total = 0;
-  data.forEach(donatur => {
-    const months = ["jan", "feb", "mar", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "des"];
-    months.forEach(month => {
-      total += donatur[month] || 0;
+  const monthKeys: MonthKey[] = ['jan', 'feb', 'mar', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'des'];
+
+  data?.forEach((item) => {
+    monthKeys.forEach((month) => {
+      total += item[month] || 0;
     });
   });
 
@@ -261,7 +366,13 @@ export async function getDonaturTahunan(tahun: number): Promise<number> {
 }
 
 export async function getTotalInfaq(tahun: number): Promise<number> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
+
+  // Validasi tahun
+  const filterResult = donaturFilterSchema.safeParse({ tahun });
+  if (!filterResult.success) {
+    throw new Error("Tahun tidak valid");
+  }
 
   const { data, error } = await supabase
     .from("Donatur")
@@ -273,7 +384,5 @@ export async function getTotalInfaq(tahun: number): Promise<number> {
     throw new Error("Gagal mengambil total infaq");
   }
 
-  // Hitung total infaq
-  const total = data.reduce((sum, donatur) => sum + (donatur.infaq || 0), 0);
-  return total;
+  return data?.reduce((total, item) => total + (item.infaq || 0), 0) || 0;
 }

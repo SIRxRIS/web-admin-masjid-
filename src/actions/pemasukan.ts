@@ -1,288 +1,241 @@
 // src/actions/pemasukan.ts
 "use server";
 
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import {
-  getPemasukanData as getPemasukanDataService,
-  getAvailableTahun as getAvailableTahunService,
-  createPemasukan as createPemasukanService,
-  updatePemasukan as updatePemasukanService,
-  deletePemasukan as deletePemasukanService,
-  getPemasukanById as getPemasukanByIdService,
-  getPemasukanBulanan as getPemasukanBulananService,
-  getPemasukanTahunan as getPemasukanTahunanService,
-  getPemasukanBySumber as getPemasukanBySumberService,
-  getPemasukanByDonatur as getPemasukanByDonaturService,
-  getPemasukanByDonaturWithDetail as getPemasukanByDonaturWithDetailService,
-  getPemasukanByDonasiKhusus as getPemasukanByDonasiKhususService,
-  getPemasukanByKotakAmal as getPemasukanByKotakAmalService,
-  getPemasukanByKotakMasjid as getPemasukanByKotakMasjidService,
-  refreshPemasukanForEntity as refreshPemasukanForEntityService,
-  syncAllPemasukan as syncAllPemasukanService,
-  type SumberPemasukan,
-} from "@/lib/services/supabase/pemasukan/pemasukan";
-import { type Pemasukan } from "@prisma/client";
+  createPemasukan,
+  deletePemasukan,
+  getPemasukanById,
+  updatePemasukan,
+} from "../lib/services/supabase/pemasukan/pemasukan";
+import {
+  type PemasukanData,
+  type CreatePemasukanInput,
+} from "../lib/schema/pemasukan/schema";
 
-// Server Actions untuk digunakan oleh Client Components
-export async function getPemasukanData(tahunFilter?: number) {
+// State untuk form action
+export interface ActionState {
+  success: boolean;
+  message: string;
+  data?: any;
+  errors?: Record<string, string[]>;
+}
+
+// Action untuk membuat pemasukan baru
+export async function createPemasukanAction(
+  prevState: ActionState,
+  formData: FormData
+): Promise<ActionState> {
   try {
-    const data = await getPemasukanDataService(tahunFilter);
-    return data;
+    const tanggal = formData.get("tanggal") as string;
+    const sumber = formData.get("sumber") as string;
+    const jumlah = formData.get("jumlah") as string;
+    const keterangan = formData.get("keterangan") as string;
+    const donaturId = formData.get("donaturId") as string;
+    const kotakAmalId = formData.get("kotakAmalId") as string;
+    const kotakMasjidId = formData.get("kotakMasjidId") as string;
+    const donasiKhususId = formData.get("donasiKhususId") as string;
+
+    // Validasi input
+    const errors: Record<string, string[]> = {};
+
+    if (!tanggal?.trim()) {
+      errors.tanggal = ["Tanggal wajib diisi"];
+    }
+    if (!sumber?.trim()) {
+      errors.sumber = ["Sumber pemasukan wajib diisi"];
+    }
+    if (!jumlah?.trim()) {
+      errors.jumlah = ["Jumlah pemasukan wajib diisi"];
+    }
+
+    // Validasi jumlah harus angka
+    const jumlahNumber = parseFloat(jumlah);
+    if (isNaN(jumlahNumber) || jumlahNumber <= 0) {
+      errors.jumlah = ["Jumlah harus berupa angka positif"];
+    }
+
+    // Validasi tanggal
+    const tanggalDate = new Date(tanggal);
+    if (isNaN(tanggalDate.getTime())) {
+      errors.tanggal = ["Format tanggal tidak valid"];
+    }
+
+    if (Object.keys(errors).length > 0) {
+      return {
+        success: false,
+        message: "Terdapat kesalahan dalam pengisian form",
+        errors,
+      };
+    }
+
+    const pemasukanData: CreatePemasukanInput = {
+      tanggal: tanggalDate,
+      tahun: tanggalDate.getFullYear(),
+      sumber: sumber.trim() as any,
+      jumlah: jumlahNumber,
+      keterangan: keterangan?.trim() || "",
+      donaturId: donaturId && donaturId !== "" ? parseInt(donaturId) : null,
+      kotakAmalId: kotakAmalId && kotakAmalId !== "" ? parseInt(kotakAmalId) : null,
+      kotakMasjidId: kotakMasjidId && kotakMasjidId !== "" ? parseInt(kotakMasjidId) : null,
+      donasiKhususId: donasiKhususId && donasiKhususId !== "" ? parseInt(donasiKhususId) : null,
+    };
+
+    const newPemasukan = await createPemasukan(pemasukanData);
+
+    revalidatePath("/pemasukan");
+    
+    return {
+      success: true,
+      message: "Pemasukan berhasil ditambahkan",
+      data: newPemasukan,
+    };
   } catch (error) {
-    console.error("Server Action - Error mengambil data pemasukan:", error);
-    throw new Error("Gagal mengambil data pemasukan");
+    console.error("Error dalam createPemasukanAction:", error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Terjadi kesalahan yang tidak diketahui",
+    };
   }
 }
 
-export async function getAvailableTahun() {
-  try {
-    const years = await getAvailableTahunService();
-    return years;
-  } catch (error) {
-    console.error("Server Action - Error mengambil data tahun:", error);
-    throw new Error("Gagal mengambil data tahun");
-  }
-}
-
-export async function getPemasukanById(id: number) {
-  try {
-    if (!id || id <= 0) {
-      throw new Error("ID pemasukan tidak valid");
-    }
-
-    const data = await getPemasukanByIdService(id);
-    return data;
-  } catch (error) {
-    console.error("Server Action - Error mengambil pemasukan by ID:", error);
-    throw new Error("Gagal mengambil data pemasukan");
-  }
-}
-
-export async function createPemasukan(
-  pemasukan: Omit<Pemasukan, "id" | "createdAt" | "updatedAt">
-) {
-  try {
-    if (!pemasukan) {
-      throw new Error("Data pemasukan tidak boleh kosong");
-    }
-
-    // Validasi field wajib
-    if (!pemasukan.tanggal) {
-      throw new Error("Tanggal pemasukan wajib diisi");
-    }
-
-    if (!pemasukan.sumber) {
-      throw new Error("Sumber pemasukan wajib diisi");
-    }
-
-    if (!pemasukan.jumlah || pemasukan.jumlah <= 0) {
-      throw new Error("Jumlah pemasukan harus lebih dari 0");
-    }
-
-    if (!pemasukan.tahun) {
-      throw new Error("Tahun pemasukan wajib diisi");
-    }
-
-    const result = await createPemasukanService(pemasukan);
-    return result;
-  } catch (error) {
-    console.error("Server Action - Error membuat pemasukan:", error);
-    throw new Error("Gagal membuat pemasukan baru");
-  }
-}
-
-export async function updatePemasukan(
+// Action untuk mengupdate pemasukan
+export async function updatePemasukanAction(
   id: number,
-  pemasukan: Partial<Omit<Pemasukan, "id" | "createdAt" | "updatedAt">>
-) {
+  prevState: ActionState,
+  formData: FormData
+): Promise<ActionState> {
   try {
-    if (!id || id <= 0) {
-      throw new Error("ID pemasukan tidak valid");
+    const tanggal = formData.get("tanggal") as string;
+    const sumber = formData.get("sumber") as string;
+    const jumlah = formData.get("jumlah") as string;
+    const keterangan = formData.get("keterangan") as string;
+    const donaturId = formData.get("donaturId") as string;
+    const kotakAmalId = formData.get("kotakAmalId") as string;
+    const kotakMasjidId = formData.get("kotakMasjidId") as string;
+    const donasiKhususId = formData.get("donasiKhususId") as string;
+
+    // Validasi input
+    const errors: Record<string, string[]> = {};
+
+    if (!tanggal?.trim()) {
+      errors.tanggal = ["Tanggal wajib diisi"];
+    }
+    if (!sumber?.trim()) {
+      errors.sumber = ["Sumber pemasukan wajib diisi"];
+    }
+    if (!jumlah?.trim()) {
+      errors.jumlah = ["Jumlah pemasukan wajib diisi"];
     }
 
-    if (!pemasukan || Object.keys(pemasukan).length === 0) {
-      throw new Error("Data update tidak boleh kosong");
+    // Validasi jumlah harus angka
+    const jumlahNumber = parseFloat(jumlah);
+    if (isNaN(jumlahNumber) || jumlahNumber <= 0) {
+      errors.jumlah = ["Jumlah harus berupa angka positif"];
     }
 
-    // Validasi field jika ada
-    if (pemasukan.jumlah !== undefined && pemasukan.jumlah <= 0) {
-      throw new Error("Jumlah pemasukan harus lebih dari 0");
+    // Validasi tanggal
+    const tanggalDate = new Date(tanggal);
+    if (isNaN(tanggalDate.getTime())) {
+      errors.tanggal = ["Format tanggal tidak valid"];
     }
 
-    const result = await updatePemasukanService(id, pemasukan);
-    return result;
+    if (Object.keys(errors).length > 0) {
+      return {
+        success: false,
+        message: "Terdapat kesalahan dalam pengisian form",
+        errors,
+      };
+    }
+
+    const updateData: Partial<Omit<PemasukanData, "id" | "createdAt" | "updatedAt">> = {
+      tanggal: tanggalDate,
+      tahun: tanggalDate.getFullYear(),
+      sumber: sumber.trim() as any,
+      jumlah: jumlahNumber,
+      keterangan: keterangan?.trim() || "",
+      donaturId: donaturId && donaturId !== "" ? parseInt(donaturId) : null,
+      kotakAmalId: kotakAmalId && kotakAmalId !== "" ? parseInt(kotakAmalId) : null,
+      kotakMasjidId: kotakMasjidId && kotakMasjidId !== "" ? parseInt(kotakMasjidId) : null,
+      donasiKhususId: donasiKhususId && donasiKhususId !== "" ? parseInt(donasiKhususId) : null,
+    };
+
+    const updatedPemasukan = await updatePemasukan(id, updateData);
+
+    revalidatePath("/pemasukan");
+    revalidatePath(`/pemasukan/${id}`);
+
+    return {
+      success: true,
+      message: "Pemasukan berhasil diperbarui",
+      data: updatedPemasukan,
+    };
   } catch (error) {
-    console.error("Server Action - Error update pemasukan:", error);
-    throw new Error("Gagal mengupdate pemasukan");
+    console.error("Error dalam updatePemasukanAction:", error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Terjadi kesalahan yang tidak diketahui",
+    };
   }
 }
 
-export async function deletePemasukan(id: number): Promise<boolean> {
+// Action untuk menghapus pemasukan
+export async function deletePemasukanAction(
+  id: number,
+  prevState: ActionState,
+  formData: FormData
+): Promise<ActionState> {
   try {
-    if (!id || id <= 0) {
-      throw new Error("ID pemasukan tidak valid");
+    // Cek apakah pemasukan ada sebelum menghapus
+    const existingPemasukan = await getPemasukanById(id);
+    if (!existingPemasukan) {
+      return {
+        success: false,
+        message: "Data pemasukan tidak ditemukan",
+      };
     }
 
-    const result = await deletePemasukanService(id);
-    // Pastikan return value adalah boolean
-    return Boolean(result);
+    await deletePemasukan(id);
+
+    revalidatePath("/pemasukan");
+
+    return {
+      success: true,
+      message: "Pemasukan berhasil dihapus",
+    };
   } catch (error) {
-    console.error("Server Action - Error hapus pemasukan:", error);
-    throw new Error("Gagal menghapus pemasukan");
+    console.error("Error dalam deletePemasukanAction:", error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Terjadi kesalahan yang tidak diketahui",
+    };
   }
 }
 
-export async function getPemasukanBulanan(tahun: number, bulan: number) {
+// Action untuk menghapus pemasukan dengan redirect
+export async function deletePemasukanWithRedirectAction(
+  id: number
+): Promise<void> {
   try {
-    if (!tahun || tahun <= 0) {
-      throw new Error("Tahun tidak valid");
-    }
-
-    if (!bulan || bulan < 1 || bulan > 12) {
-      throw new Error("Bulan tidak valid (1-12)");
-    }
-
-    const total = await getPemasukanBulananService(tahun, bulan);
-    return total;
+    await deletePemasukan(id);
+    revalidatePath("/pemasukan");
   } catch (error) {
-    console.error("Server Action - Error mengambil pemasukan bulanan:", error);
-    throw new Error("Gagal mengambil total pemasukan bulanan");
+    console.error("Error dalam deletePemasukanWithRedirectAction:", error);
+    throw error;
   }
+  
+  redirect("/pemasukan");
 }
 
-export async function getPemasukanTahunan(tahun: number) {
-  try {
-    if (!tahun || tahun <= 0) {
-      throw new Error("Tahun tidak valid");
-    }
-
-    const total = await getPemasukanTahunanService(tahun);
-    return total;
-  } catch (error) {
-    console.error("Server Action - Error mengambil pemasukan tahunan:", error);
-    throw new Error("Gagal mengambil total pemasukan tahunan");
-  }
+// Action sederhana untuk revalidate path
+export async function revalidatePemasukanAction(): Promise<void> {
+  revalidatePath("/pemasukan");
 }
 
-export async function getPemasukanBySumber(tahun: number, sumber: string) {
-  try {
-    if (!tahun || tahun <= 0) {
-      throw new Error("Tahun tidak valid");
-    }
-
-    if (!sumber) {
-      throw new Error("Sumber pemasukan tidak boleh kosong");
-    }
-
-    const total = await getPemasukanBySumberService(tahun, sumber);
-    return total;
-  } catch (error) {
-    console.error("Server Action - Error mengambil pemasukan by sumber:", error);
-    throw new Error("Gagal mengambil pemasukan berdasarkan sumber");
-  }
+// Action untuk revalidate specific pemasukan
+export async function revalidatePemasukanDetailAction(id: number): Promise<void> {
+  revalidatePath(`/pemasukan/${id}`);
+  revalidatePath("/pemasukan");
 }
 
-export async function getPemasukanByDonatur(donaturId: number) {
-  try {
-    if (!donaturId || donaturId <= 0) {
-      throw new Error("ID donatur tidak valid");
-    }
-
-    const data = await getPemasukanByDonaturService(donaturId);
-    return data;
-  } catch (error) {
-    console.error("Server Action - Error mengambil pemasukan by donatur:", error);
-    throw new Error("Gagal mengambil pemasukan berdasarkan donatur");
-  }
-}
-
-export async function getPemasukanByDonaturWithDetail(donaturId: number) {
-  try {
-    if (!donaturId || donaturId <= 0) {
-      throw new Error("ID donatur tidak valid");
-    }
-
-    const data = await getPemasukanByDonaturWithDetailService(donaturId);
-    return data;
-  } catch (error) {
-    console.error("Server Action - Error mengambil pemasukan dengan detail donatur:", error);
-    throw new Error("Gagal mengambil pemasukan dengan detail donatur");
-  }
-}
-
-export async function getPemasukanByDonasiKhusus(donasiKhususId: number) {
-  try {
-    if (!donasiKhususId || donasiKhususId <= 0) {
-      throw new Error("ID donasi khusus tidak valid");
-    }
-
-    const data = await getPemasukanByDonasiKhususService(donasiKhususId);
-    return data;
-  } catch (error) {
-    console.error("Server Action - Error mengambil pemasukan by donasi khusus:", error);
-    throw new Error("Gagal mengambil pemasukan berdasarkan donasi khusus");
-  }
-}
-
-export async function getPemasukanByKotakAmal(kotakAmalId: number) {
-  try {
-    if (!kotakAmalId || kotakAmalId <= 0) {
-      throw new Error("ID kotak amal tidak valid");
-    }
-
-    const data = await getPemasukanByKotakAmalService(kotakAmalId);
-    return data;
-  } catch (error) {
-    console.error("Server Action - Error mengambil pemasukan by kotak amal:", error);
-    throw new Error("Gagal mengambil pemasukan berdasarkan kotak amal");
-  }
-}
-
-export async function getPemasukanByKotakMasjid(kotakMasjidId: number) {
-  try {
-    if (!kotakMasjidId || kotakMasjidId <= 0) {
-      throw new Error("ID kotak masjid tidak valid");
-    }
-
-    const data = await getPemasukanByKotakMasjidService(kotakMasjidId);
-    return data;
-  } catch (error) {
-    console.error("Server Action - Error mengambil pemasukan by kotak masjid:", error);
-    throw new Error("Gagal mengambil pemasukan berdasarkan kotak masjid");
-  }
-}
-
-export async function refreshPemasukanForEntity(
-  entityType: "donatur" | "kotakAmal" | "kotakMasjid" | "donasiKhusus",
-  entityId: number
-) {
-  try {
-    if (!entityType) {
-      throw new Error("Tipe entitas tidak boleh kosong");
-    }
-
-    if (!entityId || entityId <= 0) {
-      throw new Error("ID entitas tidak valid");
-    }
-
-    const validEntityTypes = ["donatur", "kotakAmal", "kotakMasjid", "donasiKhusus"];
-    if (!validEntityTypes.includes(entityType)) {
-      throw new Error("Tipe entitas tidak valid");
-    }
-
-    const result = await refreshPemasukanForEntityService(entityType, entityId);
-    return Boolean(result);
-  } catch (error) {
-    console.error("Server Action - Error refresh pemasukan for entity:", error);
-    throw new Error("Gagal refresh pemasukan untuk entitas");
-  }
-}
-
-export async function syncAllPemasukan() {
-  try {
-    await syncAllPemasukanService();
-    return true;
-  } catch (error) {
-    console.error("Server Action - Error sync semua pemasukan:", error);
-    throw new Error("Gagal mensinkronkan semua data pemasukan");
-  }
-}

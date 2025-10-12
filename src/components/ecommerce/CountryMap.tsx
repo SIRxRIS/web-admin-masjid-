@@ -1,12 +1,6 @@
 import React from "react";
-// import { VectorMap } from "@react-jvectormap/core";
 import { worldMill } from "@react-jvectormap/world";
-import dynamic from "next/dynamic";
-
-const VectorMap = dynamic(
-  () => import("@react-jvectormap/core").then((mod) => mod.VectorMap),
-  { ssr: false }
-);
+import VectorMapWrapper from "../charts/VectorMapWrapper";
 
 // Define the component props
 interface CountryMapProps {
@@ -34,7 +28,7 @@ type Marker = {
 
 const CountryMap: React.FC<CountryMapProps> = ({ mapColor }) => {
   return (
-    <VectorMap
+    <VectorMapWrapper
       map={worldMill}
       backgroundColor="transparent"
       markerStyle={

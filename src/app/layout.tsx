@@ -8,19 +8,13 @@ const outfit = Outfit({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  icons: {
-    icon: "/images/favicon.ico",
-  },
-};
-
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="id">
       <body className={`${outfit.className} dark:bg-gray-900`}>
         <ThemeProvider>
           <SidebarProvider>{children}</SidebarProvider>
@@ -29,3 +23,11 @@ export default function RootLayout({
     </html>
   );
 }
+
+export const metadata: Metadata = {
+  title: {
+    default: 'Masjid Jawahiruzzarqa',
+    template: '%s | Masjid Jawahiruzzarqa',
+  },
+  description: 'Portal manajemen Masjid Jawahiruzzarqa.',
+};

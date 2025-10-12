@@ -1,11 +1,12 @@
 // src/lib/services/supabase/kotak-amal.ts
-import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { KotakAmalData } from "@/components/admin/layout/finance/pemasukan/table-donation/schema";
+import { supabaseAdmin } from "@/lib/supabase/admin";
+import { KotakAmalData } from "@/lib/schema/pemasukan/schema";
+import { syncPemasukanForKotakAmal } from "./pemasukan/sync-helpers";
 
 export async function getKotakAmalData(
   tahunFilter?: number
 ): Promise<KotakAmalData[]> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
   let query = supabase
     .from("KotakAmal")
@@ -43,7 +44,7 @@ export async function updateKotakAmalBulanan(
     | "des",
   jumlah: number
 ): Promise<KotakAmalData> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
   const { data, error } = await supabase
     .from("KotakAmal")
@@ -57,11 +58,19 @@ export async function updateKotakAmalBulanan(
     throw new Error(`Gagal mengupdate kotak amal bulan ${bulan}`);
   }
 
+  // AUTO-SYNC: Update tabel Pemasukan
+  try {
+    await syncPemasukanForKotakAmal(id);
+  } catch (syncError) {
+    console.error("Error sync pemasukan setelah update kotak amal bulanan:", syncError);
+    // Tidak throw error agar update tetap berhasil
+  }
+
   return data;
 }
 
 export async function getAvailableTahun(): Promise<number[]> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
   const { data, error } = await supabase
     .from("KotakAmal")
@@ -77,7 +86,7 @@ export async function getAvailableTahun(): Promise<number[]> {
 }
 
 export async function updateKotakAmalOrder(kotakAmalData: KotakAmalData[]) {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
   const updates = kotakAmalData.map((item, index) => ({
     id: item.id,
@@ -99,7 +108,7 @@ export async function updateKotakAmalOrder(kotakAmalData: KotakAmalData[]) {
 export async function getKotakAmalById(
   id: number
 ): Promise<KotakAmalData | null> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
   const { data, error } = await supabase
     .from("KotakAmal")
@@ -120,7 +129,7 @@ export async function createKotakAmal(
     tahun: number;
   }
 ): Promise<KotakAmalData> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
   const { data: lastItem, error: lastItemError } = await supabase
     .from("KotakAmal")
@@ -153,6 +162,14 @@ export async function createKotakAmal(
     throw new Error("Gagal membuat kotak amal");
   }
 
+  // AUTO-SYNC: Update tabel Pemasukan
+  try {
+    await syncPemasukanForKotakAmal(data.id);
+  } catch (syncError) {
+    console.error("Error sync pemasukan setelah create kotak amal:", syncError);
+    // Tidak throw error agar create tetap berhasil
+  }
+
   return data;
 }
 
@@ -160,7 +177,7 @@ export async function updateKotakAmal(
   id: number,
   kotakAmal: Partial<Omit<KotakAmalData, "id" | "createdAt">>
 ): Promise<KotakAmalData> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
   const { data, error } = await supabase
     .from("KotakAmal")
@@ -174,12 +191,20 @@ export async function updateKotakAmal(
     throw new Error("Gagal mengupdate kotak amal");
   }
 
+  // AUTO-SYNC: Update tabel Pemasukan
+  try {
+    await syncPemasukanForKotakAmal(id);
+  } catch (syncError) {
+    console.error("Error sync pemasukan setelah update kotak amal:", syncError);
+    // Tidak throw error agar update tetap berhasil
+  }
+
   return data;
 }
 
 export async function deleteKotakAmal(id: number): Promise<boolean> {
   try {
-    const supabase = await createServerSupabaseClient();
+    const supabase = supabaseAdmin;
 
     const { data: kotakAmalToDelete, error: getError } = await supabase
       .from("KotakAmal")
@@ -188,6 +213,14 @@ export async function deleteKotakAmal(id: number): Promise<boolean> {
       .single();
 
     if (getError) throw getError;
+
+    // AUTO-SYNC: Hapus data pemasukan terkait terlebih dahulu
+    const { error: deletePemasukanError } = await supabase
+      .from("Pemasukan")
+      .delete()
+      .eq("kotakAmalId", id);
+
+    if (deletePemasukanError) throw deletePemasukanError;
 
     const { error: deleteError } = await supabase
       .from("KotakAmal")
@@ -226,7 +259,7 @@ export async function getKotakAmalBulanan(
   tahun: number,
   bulan: string
 ): Promise<number> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
   const bulanMapping: { [key: string]: string } = {
     jan: "jan",
@@ -269,7 +302,7 @@ export async function getKotakAmalBulanan(
 }
 
 export async function getKotakAmalTahunan(tahun: number): Promise<number> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
   const { data, error } = await supabase
     .from("KotakAmal")
@@ -303,7 +336,7 @@ export async function getKotakAmalTahunan(tahun: number): Promise<number> {
 }
 
 export async function getTotalKotakAmal(tahun?: number): Promise<number> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
   let query = supabase
     .from("KotakAmal")

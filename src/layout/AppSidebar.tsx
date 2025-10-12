@@ -6,19 +6,26 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useSidebar } from "../context/SidebarContext";
 import {
-  BoxCubeIcon,
+  // BoxCubeIcon,
   // CalenderIcon, // Dicomment karena calendar dinonaktifkan
   // ChevronDownIcon,
   GridIcon,
   HorizontaLDots,
-  ListIcon,
+  // ListIcon,
   // PageIcon, // Dicomment karena pages dinonaktifkan
   // PieChartIcon, // Dicomment karena others dinonaktifkan
-  PlugInIcon,
-  TableIcon,
-  UserCircleIcon,
+  // PlugInIcon,
+  // TableIcon,
+  // UserCircleIcon,
+  DollarLineIcon,
+  FileIcon,
+  BoxIcon,
+  DocsIcon,
+  TaskIcon,
 } from "../icons/index";
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Settings } from 'lucide-react'
+import { useAuth } from "../hooks/useAuth";
+import { isAdmin } from "../lib/utils/roles";
 
 
 type NavItem = {
@@ -32,20 +39,58 @@ const navItems: NavItem[] = [
   {
     icon: <GridIcon />,
     name: "Dashboard",
-    path: "/", // Langsung ke path dashboard
+    path: "/", 
   },
-  // Calendar dicomment
-  // {
-  //   icon: <CalenderIcon />,
-  //   name: "Calendar",
-  //   path: "/calendar",
-  // },
   {
-    icon: <UserCircleIcon />,
-    name: "User Profile",
-    path: "/profile",
+    name: "Keuangan",
+    icon: <DollarLineIcon />,
+    subItems: [
+      { name: "Pemasukan", path: "/pemasukan", pro: false },
+      { name: "Pengeluaran", path: "/pengeluaran", pro: false },
+      { name: "Penagihan Donatur", path: "/penagihan-donatur", pro: false },
+    ],
   },
+  {
+    name: "Manajemen",
+    icon: <FileIcon />,
+    path: "/manajemen",
+    subItems: [
+      { name: "Daftar Pengurus", path: "/daftar-pengurus", pro: false },
+      { name: "Visi & Misi", path: "/visi-misi", pro: false },
+    ],
+  },
+  {
+    name: "Inventaris",
+    icon: <BoxIcon />,
+    path: "/inventory",
+  },
+  {
+    name: "Konten",
+    icon: <TaskIcon />,
+    path: "/content",
+  },
+  {
+    name: "Laporan Keuangan",
+    icon: <DocsIcon />,
+    path: "/laporan-keuangan",
+    subItems: [
+      { name: "Rekap Tahunan", path: "/rekap-tahunan", pro: false },
+      { name: "Laporan Jumat", path: "/laporan-jumat", pro: false },
+    ],
+  },
+  /*  Calendar dicomment
+    {
+      icon: <CalenderIcon />,
+      name: "Calendar",
+      path: "/calendar",
+    },
+    {
+      icon: <UserCircleIcon />,
+      name: "User Profile",
+      path: "/profile",
+    }, */
 
+  /* Forms dan Tables dicomment karena tidak diperlukan
   {
     name: "Forms",
     icon: <ListIcon />,
@@ -55,53 +100,96 @@ const navItems: NavItem[] = [
     name: "Tables",
     icon: <TableIcon />,
     subItems: [{ name: "Basic Tables", path: "/basic-tables", pro: false }],
-  },
-  // Pages dicomment
-  // {
-  //   name: "Pages",
-  //   icon: <PageIcon />,
-  //   subItems: [
-  //     { name: "Blank Page", path: "/blank", pro: false },
-  //     { name: "404 Error", path: "/error-404", pro: false },
-  //   ],
-  // },
+  }, */
+  /*  Pages dicomment
+    {
+      name: "Pages",
+      icon: <PageIcon />,
+      subItems: [
+        { name: "Blank Page", path: "/blank", pro: false },
+        { name: "404 Error", path: "/error-404", pro: false },
+      ],
+    }, */
 ];
 
-// Others items dicomment seluruhnya
-// const othersItems: NavItem[] = [
-//   {
-//     icon: <PieChartIcon />,
-//     name: "Charts",
-//     subItems: [
-//       { name: "Line Chart", path: "/line-chart", pro: false },
-//       { name: "Bar Chart", path: "/bar-chart", pro: false },
-//     ],
-//   },
-//   {
-//     icon: <BoxCubeIcon />,
-//     name: "UI Elements",
-//     subItems: [
-//       { name: "Alerts", path: "/alerts", pro: false },
-//       { name: "Avatar", path: "/avatars", pro: false },
-//       { name: "Badge", path: "/badge", pro: false },
-//       { name: "Buttons", path: "/buttons", pro: false },
-//       { name: "Images", path: "/images", pro: false },
-//       { name: "Videos", path: "/videos", pro: false },
-//     ],
-//   },
-//   {
-//     icon: <PlugInIcon />,
-//     name: "Authentication",
-//     subItems: [
-//       { name: "Sign In", path: "/signin", pro: false },
-//       { name: "Sign Up", path: "/signup", pro: false },
-//     ],
-//   },
-// ];
+/* Others items dicomment seluruhnya
+const othersItems: NavItem[] = [
+  {
+    icon: <PieChartIcon />,
+    name: "Charts",
+    subItems: [
+      { name: "Line Chart", path: "/line-chart", pro: false },
+      { name: "Bar Chart", path: "/bar-chart", pro: false },
+    ],
+  },
+  {
+    icon: <BoxCubeIcon />,
+    name: "UI Elements",
+    subItems: [
+      { name: "Alerts", path: "/alerts", pro: false },
+      { name: "Avatar", path: "/avatars", pro: false },
+      { name: "Badge", path: "/badge", pro: false },
+      { name: "Buttons", path: "/buttons", pro: false },
+      { name: "Images", path: "/images", pro: false },
+      { name: "Videos", path: "/videos", pro: false },
+    ],
+  },
+  {
+    icon: <PlugInIcon />,
+    name: "Authentication",
+    subItems: [
+      { name: "Sign In", path: "/signin", pro: false },
+      { name: "Sign Up", path: "/signup", pro: false },
+    ],
+  },
+]; */
 
 const AppSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const pathname = usePathname();
+  const { userProfile } = useAuth();
+
+  // Create dynamic navigation items based on user role
+  const getNavItems = (): NavItem[] => {
+    // Force admin menus when currently inside /admin regardless of auth loading state
+    if (pathname.startsWith('/admin') || isAdmin(userProfile?.role)) {
+      return [
+        {
+          name: "Dashboard Admin",
+          icon: <GridIcon />,
+          path: "/admin",
+        },
+        {
+          name: "Email Whitelist",
+          icon: <FileIcon />,
+          path: "/admin/email-whitelist",
+        },
+        {
+          name: "User Activity",
+          icon: <TaskIcon />,
+          path: "/admin/user-activity",
+        },
+        {
+          name: "System Health",
+          icon: <BoxIcon />,
+          path: "/admin/system-health",
+        },
+        {
+          name: "Site Configuration",
+          icon: <Settings />,
+          path: "/admin/site-config",
+        },
+        {
+          name: "Audit Trail",
+          icon: <DocsIcon />,
+          path: "/admin/audit-trail",
+        },
+      ];
+    }
+    
+    // For non-admin users, show regular menus without admin section
+    return [...navItems];
+  };
 
   const renderMenuItems = (
     navItems: NavItem[],
@@ -235,7 +323,7 @@ const AppSidebar: React.FC = () => {
     // Check if the current path matches any submenu item
     let submenuMatched = false;
     ["main"].forEach((menuType) => { // Hanya main karena others dicomment
-      const items = menuType === "main" ? navItems : []; // othersItems dicomment
+      const items = menuType === "main" ? getNavItems() : []; // othersItems dicomment
       items.forEach((nav, index) => {
         if (nav.subItems) {
           nav.subItems.forEach((subItem) => {
@@ -255,7 +343,7 @@ const AppSidebar: React.FC = () => {
     if (!submenuMatched) {
       setOpenSubmenu(null);
     }
-  }, [pathname, isActive]);
+  }, [pathname, isActive, userProfile]);
 
   useEffect(() => {
     // Set the height of the submenu items when the submenu is opened
@@ -310,6 +398,8 @@ const AppSidebar: React.FC = () => {
                 alt="Logo"
                 width={150}
                 height={40}
+                style={{ width: "auto", height: "auto" }}
+                priority
               />
               <Image
                 className="hidden dark:block"
@@ -317,14 +407,18 @@ const AppSidebar: React.FC = () => {
                 alt="Logo"
                 width={150}
                 height={40}
+                style={{ width: "auto", height: "auto" }}
+                priority
               />
             </>
           ) : (
             <Image
-              src="/images/logo-icon.svg"
+              src="/images/logo-masjid.png"
               alt="Logo"
               width={32}
               height={32}
+              style={{ width: "auto", height: "auto" }}
+              priority
             />
           )}
         </Link>
@@ -345,7 +439,7 @@ const AppSidebar: React.FC = () => {
                   <HorizontaLDots />
                 )}
               </h2>
-              {renderMenuItems(navItems, "main")}
+              {renderMenuItems(getNavItems(), "main")}
             </div>
 
             {/* Others section dicomment */}

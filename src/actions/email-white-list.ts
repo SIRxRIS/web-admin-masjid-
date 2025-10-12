@@ -1,6 +1,8 @@
 // src/actions/email-white-list.ts
 "use server";
 
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
 import {
   getEmailWhitelist as getEmailWhitelistService,
   getEmailWhitelistById as getEmailWhitelistByIdService,
@@ -9,8 +11,9 @@ import {
   toggleEmailWhitelistStatus as toggleEmailWhitelistStatusService,
   deleteEmailWhitelist as deleteEmailWhitelistService,
   checkEmailWhitelist as checkEmailWhitelistService,
-} from "@/lib/services/supabase/emailWhitelist/emailWhitelist";
-import { EmailWhitelistData } from "@/components/admin/layout/emailWhiteList/schema";
+} from "@/lib/services/supabase/emailWhiteList/emailWhiteList";
+import { EmailWhitelistData } from "@/lib/schema/email-whitelist";
+import { createEmailWhitelistNotification } from "./notifications";
 
 // Server Action untuk mengambil semua data email whitelist
 export async function getEmailWhitelist(isActive?: boolean) {
@@ -58,6 +61,23 @@ export async function createEmailWhitelist(
     }
 
     const result = await createEmailWhitelistService(whitelistData);
+    
+    // Trigger notifikasi untuk admin
+    try {
+      const session = await getServerSession(authOptions);
+      const addedByName = session?.user?.name || "Admin";
+      
+      await createEmailWhitelistNotification(
+        whitelistData.email,
+        whitelistData.jabatan,
+        whitelistData.role,
+        addedByName
+      );
+    } catch (notifError) {
+      console.error("Error creating email whitelist notification:", notifError);
+      // Jangan gagalkan proses utama jika notifikasi gagal
+    }
+    
     return result;
   } catch (error) {
     console.error("Server Action - Error membuat email whitelist:", error);

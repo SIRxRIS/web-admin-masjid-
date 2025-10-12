@@ -1,6 +1,9 @@
 // src/actions/konten.ts
 "use server";
 
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
+import { createKontenBaruNotification } from "./notifications";
 import {
   createKontenWithFoto as createKontenWithFotoService,
   updateKontenWithOptionalFoto as updateKontenWithOptionalFotoService,
@@ -23,28 +26,24 @@ import {
   searchKonten as searchKontenService,
   incrementViewCount as incrementViewCountService,
   getTotalKontenPublished as getTotalKontenPublishedService,
-  // ✅ Import fungsi baru
   getKontenWithRelations as getKontenWithRelationsService,
   getKontenForPublic as getKontenForPublicService,
   getKontenBeranda as getKontenBerandaService,
+  // Import types dari service layer
+  type ContentFormValues,
+  type ContentFormInputValues,
+  type StatusKonten,
+  type KontenData,
+  type GambarKontenData,
+  type TagKontenData,
+  type GambarKontenFormValues,
+  type TagKontenFormValues,
 } from "@/lib/services/supabase/konten";
-
-// ✅ Perbaiki import types - gunakan yang benar dari schema
-import {
-  ContentFormValues,
-  ContentFormInputValues,
-  StatusKonten,
-} from "@/components/admin/layout/content/form/content-schema";
-
-import {
-  GambarKontenFormValues,
-  TagKontenFormValues,
-} from "@/components/admin/layout/content/form/content-edit/edit-schema";
 
 // ===== KONTEN UTAMA =====
 
 export async function createKontenWithFoto(
-  data: ContentFormInputValues, // ✅ Gunakan InputValues untuk create
+  data: ContentFormInputValues,
   file?: File
 ) {
   try {
@@ -53,17 +52,34 @@ export async function createKontenWithFoto(
     }
 
     const result = await createKontenWithFotoService(data, file || null);
+    
+    // Trigger notifikasi untuk pengurus
+    try {
+      const session = await getServerSession(authOptions);
+      const createdByName = session?.user?.name || "Admin";
+      
+      await createKontenBaruNotification(
+        data.judul,
+        data.kategoriId?.toString() || "Artikel",
+        createdByName
+      );
+    } catch (notifError) {
+      console.error("Error creating content notification:", notifError);
+      // Jangan gagalkan proses utama jika notifikasi gagal
+    }
+    
     return result;
   } catch (error) {
     console.error("Server Action - Error membuat konten:", error);
-    throw new Error("Gagal membuat konten baru");
+    throw new Error(
+      error instanceof Error ? error.message : "Gagal membuat konten baru"
+    );
   }
 }
 
-// ✅ Perbaiki type parameter
 export async function updateKontenWithOptionalFoto(
   id: number,
-  updates: Partial<ContentFormValues>, // ✅ Gunakan ContentFormValues
+  updates: Partial<ContentFormValues>,
   file?: File
 ) {
   try {
@@ -79,21 +95,25 @@ export async function updateKontenWithOptionalFoto(
     return result;
   } catch (error) {
     console.error("Server Action - Error update konten:", error);
-    throw new Error("Gagal mengupdate konten");
+    throw new Error(
+      error instanceof Error ? error.message : "Gagal mengupdate konten"
+    );
   }
 }
 
-export async function getKontenData() {
+export async function getKontenData(): Promise<KontenData[]> {
   try {
     const data = await getKontenDataService();
     return data;
   } catch (error) {
     console.error("Server Action - Error mengambil data konten:", error);
-    throw new Error("Gagal mengambil data konten");
+    throw new Error(
+      error instanceof Error ? error.message : "Gagal mengambil data konten"
+    );
   }
 }
 
-export async function getKontenById(id: number) {
+export async function getKontenById(id: number): Promise<KontenData> {
   try {
     if (!id || id <= 0) {
       throw new Error("ID konten tidak valid");
@@ -103,11 +123,13 @@ export async function getKontenById(id: number) {
     return data;
   } catch (error) {
     console.error("Server Action - Error mengambil konten by ID:", error);
-    throw new Error("Gagal mengambil data konten");
+    throw new Error(
+      error instanceof Error ? error.message : "Gagal mengambil data konten"
+    );
   }
 }
 
-export async function getKontenBySlug(slug: string) {
+export async function getKontenBySlug(slug: string): Promise<KontenData> {
   try {
     if (!slug || slug.trim() === "") {
       throw new Error("Slug konten tidak valid");
@@ -117,7 +139,9 @@ export async function getKontenBySlug(slug: string) {
     return data;
   } catch (error) {
     console.error("Server Action - Error mengambil konten by slug:", error);
-    throw new Error("Gagal mengambil data konten");
+    throw new Error(
+      error instanceof Error ? error.message : "Gagal mengambil data konten"
+    );
   }
 }
 
@@ -131,12 +155,15 @@ export async function deleteKonten(id: number): Promise<boolean> {
     return Boolean(result);
   } catch (error) {
     console.error("Server Action - Error hapus konten:", error);
-    throw new Error("Gagal menghapus konten");
+    throw new Error(
+      error instanceof Error ? error.message : "Gagal menghapus konten"
+    );
   }
 }
 
-// ✅ FUNGSI BARU - Konten dengan relasi
-export async function getKontenWithRelations(id: number) {
+// ===== KONTEN DENGAN RELASI =====
+
+export async function getKontenWithRelations(id: number): Promise<KontenData> {
   try {
     if (!id || id <= 0) {
       throw new Error("ID konten tidak valid");
@@ -149,12 +176,18 @@ export async function getKontenWithRelations(id: number) {
       "Server Action - Error mengambil konten dengan relasi:",
       error
     );
-    throw new Error("Gagal mengambil data konten dengan relasi");
+    throw new Error(
+      error instanceof Error
+        ? error.message
+        : "Gagal mengambil data konten dengan relasi"
+    );
   }
 }
 
-// ✅ FUNGSI BARU - Konten untuk public
-export async function getKontenForPublic(limit = 10, offset = 0) {
+export async function getKontenForPublic(
+  limit = 10,
+  offset = 0
+): Promise<KontenData[]> {
   try {
     if (limit < 1 || limit > 50) {
       throw new Error("Limit harus antara 1-50");
@@ -168,18 +201,21 @@ export async function getKontenForPublic(limit = 10, offset = 0) {
     return data;
   } catch (error) {
     console.error("Server Action - Error mengambil konten public:", error);
-    throw new Error("Gagal mengambil konten public");
+    throw new Error(
+      error instanceof Error ? error.message : "Gagal mengambil konten public"
+    );
   }
 }
 
-// ✅ FUNGSI BARU - Konten beranda
-export async function getKontenBeranda() {
+export async function getKontenBeranda(): Promise<KontenData[]> {
   try {
     const data = await getKontenBerandaService();
     return data;
   } catch (error) {
     console.error("Server Action - Error mengambil konten beranda:", error);
-    throw new Error("Gagal mengambil konten beranda");
+    throw new Error(
+      error instanceof Error ? error.message : "Gagal mengambil konten beranda"
+    );
   }
 }
 
@@ -188,7 +224,7 @@ export async function getKontenBeranda() {
 export async function uploadMultipleFotosKonten(
   kontenId: number,
   files: File[]
-) {
+): Promise<GambarKontenData[]> {
   try {
     if (!kontenId || kontenId <= 0) {
       throw new Error("ID konten tidak valid");
@@ -198,18 +234,27 @@ export async function uploadMultipleFotosKonten(
       throw new Error("File gambar tidak boleh kosong");
     }
 
+    // Validasi file types
+    for (const file of files) {
+      if (!file.type.startsWith("image/")) {
+        throw new Error(`File ${file.name} bukan file gambar yang valid`);
+      }
+    }
+
     const result = await uploadMultipleFotosKontenService(kontenId, files);
     return result;
   } catch (error) {
     console.error("Server Action - Error upload multiple fotos:", error);
-    throw new Error("Gagal mengupload gambar konten");
+    throw new Error(
+      error instanceof Error ? error.message : "Gagal mengupload gambar konten"
+    );
   }
 }
 
 export async function updateGambarKonten(
   id: number,
   updates: GambarKontenFormValues
-) {
+): Promise<GambarKontenData | null> {
   try {
     if (!id || id <= 0) {
       throw new Error("ID gambar konten tidak valid");
@@ -223,7 +268,9 @@ export async function updateGambarKonten(
     return result;
   } catch (error) {
     console.error("Server Action - Error update gambar konten:", error);
-    throw new Error("Gagal mengupdate gambar konten");
+    throw new Error(
+      error instanceof Error ? error.message : "Gagal mengupdate gambar konten"
+    );
   }
 }
 
@@ -237,11 +284,15 @@ export async function deleteGambarKonten(id: number): Promise<boolean> {
     return Boolean(result);
   } catch (error) {
     console.error("Server Action - Error hapus gambar konten:", error);
-    throw new Error("Gagal menghapus gambar konten");
+    throw new Error(
+      error instanceof Error ? error.message : "Gagal menghapus gambar konten"
+    );
   }
 }
 
-export async function getGambarKontenByKontenId(kontenId: number) {
+export async function getGambarKontenByKontenId(
+  kontenId: number
+): Promise<GambarKontenData[]> {
   try {
     if (!kontenId || kontenId <= 0) {
       throw new Error("ID konten tidak valid");
@@ -251,13 +302,17 @@ export async function getGambarKontenByKontenId(kontenId: number) {
     return data;
   } catch (error) {
     console.error("Server Action - Error mengambil gambar konten:", error);
-    throw new Error("Gagal mengambil gambar konten");
+    throw new Error(
+      error instanceof Error ? error.message : "Gagal mengambil gambar konten"
+    );
   }
 }
 
 // ===== TAG KONTEN =====
 
-export async function createTagKonten(tag: TagKontenFormValues) {
+export async function createTagKonten(
+  tag: TagKontenFormValues
+): Promise<TagKontenData | null> {
   try {
     if (!tag) {
       throw new Error("Data tag tidak boleh kosong");
@@ -271,24 +326,28 @@ export async function createTagKonten(tag: TagKontenFormValues) {
     return result;
   } catch (error) {
     console.error("Server Action - Error membuat tag konten:", error);
-    throw new Error("Gagal membuat tag konten baru");
+    throw new Error(
+      error instanceof Error ? error.message : "Gagal membuat tag konten baru"
+    );
   }
 }
 
-export async function getTagKonten() {
+export async function getTagKonten(): Promise<TagKontenData[]> {
   try {
     const data = await getTagKontenService();
     return data;
   } catch (error) {
     console.error("Server Action - Error mengambil data tag konten:", error);
-    throw new Error("Gagal mengambil data tag konten");
+    throw new Error(
+      error instanceof Error ? error.message : "Gagal mengambil data tag konten"
+    );
   }
 }
 
 export async function updateTagKonten(
   id: number,
   updates: TagKontenFormValues
-) {
+): Promise<TagKontenData | null> {
   try {
     if (!id || id <= 0) {
       throw new Error("ID tag konten tidak valid");
@@ -302,7 +361,9 @@ export async function updateTagKonten(
     return result;
   } catch (error) {
     console.error("Server Action - Error update tag konten:", error);
-    throw new Error("Gagal mengupdate tag konten");
+    throw new Error(
+      error instanceof Error ? error.message : "Gagal mengupdate tag konten"
+    );
   }
 }
 
@@ -316,13 +377,18 @@ export async function deleteTagKonten(id: number): Promise<boolean> {
     return Boolean(result);
   } catch (error) {
     console.error("Server Action - Error hapus tag konten:", error);
-    throw new Error("Gagal menghapus tag konten");
+    throw new Error(
+      error instanceof Error ? error.message : "Gagal menghapus tag konten"
+    );
   }
 }
 
 // ===== RELASI TAG DAN KONTEN =====
 
-export async function addTagsToKonten(kontenId: number, tagIds: number[]) {
+export async function addTagsToKonten(
+  kontenId: number,
+  tagIds: number[]
+): Promise<any[]> {
   try {
     if (!kontenId || kontenId <= 0) {
       throw new Error("ID konten tidak valid");
@@ -342,11 +408,16 @@ export async function addTagsToKonten(kontenId: number, tagIds: number[]) {
     return result;
   } catch (error) {
     console.error("Server Action - Error menambah tags ke konten:", error);
-    throw new Error("Gagal menambahkan tags ke konten");
+    throw new Error(
+      error instanceof Error ? error.message : "Gagal menambahkan tags ke konten"
+    );
   }
 }
 
-export async function removeTagFromKonten(kontenId: number, tagId: number) {
+export async function removeTagFromKonten(
+  kontenId: number,
+  tagId: number
+): Promise<{ message: string }> {
   try {
     if (!kontenId || kontenId <= 0) {
       throw new Error("ID konten tidak valid");
@@ -360,11 +431,15 @@ export async function removeTagFromKonten(kontenId: number, tagId: number) {
     return result;
   } catch (error) {
     console.error("Server Action - Error menghapus tag dari konten:", error);
-    throw new Error("Gagal menghapus tag dari konten");
+    throw new Error(
+      error instanceof Error ? error.message : "Gagal menghapus tag dari konten"
+    );
   }
 }
 
-export async function getTagsByKontenId(kontenId: number) {
+export async function getTagsByKontenId(
+  kontenId: number
+): Promise<TagKontenData[]> {
   try {
     if (!kontenId || kontenId <= 0) {
       throw new Error("ID konten tidak valid");
@@ -374,13 +449,17 @@ export async function getTagsByKontenId(kontenId: number) {
     return data;
   } catch (error) {
     console.error("Server Action - Error mengambil tags by konten ID:", error);
-    throw new Error("Gagal mengambil tags konten");
+    throw new Error(
+      error instanceof Error ? error.message : "Gagal mengambil tags konten"
+    );
   }
 }
 
 // ===== FILTER DAN PENCARIAN =====
 
-export async function getKontenByKategori(kategoriId: number) {
+export async function getKontenByKategori(
+  kategoriId: number
+): Promise<KontenData[]> {
   try {
     if (!kategoriId || kategoriId <= 0) {
       throw new Error("ID kategori tidak valid");
@@ -390,11 +469,15 @@ export async function getKontenByKategori(kategoriId: number) {
     return data;
   } catch (error) {
     console.error("Server Action - Error mengambil konten by kategori:", error);
-    throw new Error("Gagal mengambil konten berdasarkan kategori");
+    throw new Error(
+      error instanceof Error
+        ? error.message
+        : "Gagal mengambil konten berdasarkan kategori"
+    );
   }
 }
 
-export async function searchKonten(query: string) {
+export async function searchKonten(query: string): Promise<KontenData[]> {
   try {
     if (!query || query.trim() === "") {
       throw new Error("Query pencarian tidak boleh kosong");
@@ -407,11 +490,15 @@ export async function searchKonten(query: string) {
     return data;
   } catch (error) {
     console.error("Server Action - Error pencarian konten:", error);
-    throw new Error("Gagal melakukan pencarian konten");
+    throw new Error(
+      error instanceof Error ? error.message : "Gagal melakukan pencarian konten"
+    );
   }
 }
 
-export async function incrementViewCount(id: number) {
+export async function incrementViewCount(
+  id: number
+): Promise<{ success: boolean }> {
   try {
     if (!id || id <= 0) {
       throw new Error("ID konten tidak valid");
@@ -421,13 +508,15 @@ export async function incrementViewCount(id: number) {
     return result;
   } catch (error) {
     console.error("Server Action - Error increment view count:", error);
-    throw new Error("Gagal menambah view count");
+    throw new Error(
+      error instanceof Error ? error.message : "Gagal menambah view count"
+    );
   }
 }
 
 // ===== STATISTIK =====
 
-export async function getTotalKontenPublished() {
+export async function getTotalKontenPublished(): Promise<number> {
   try {
     const total = await getTotalKontenPublishedService();
     return total;
@@ -436,18 +525,34 @@ export async function getTotalKontenPublished() {
       "Server Action - Error mengambil total konten published:",
       error
     );
-    throw new Error("Gagal mengambil total konten published");
+    throw new Error(
+      error instanceof Error
+        ? error.message
+        : "Gagal mengambil total konten published"
+    );
   }
 }
 
 // ===== UTILITAS TAMBAHAN =====
+
+interface PaginationResult {
+  data: KontenData[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
+}
 
 export async function getKontenWithPagination(
   page: number = 1,
   limit: number = 10,
   kategoriId?: number,
   status?: string
-) {
+): Promise<PaginationResult> {
   try {
     if (page < 1) {
       throw new Error("Nomor halaman tidak valid");
@@ -457,27 +562,29 @@ export async function getKontenWithPagination(
       throw new Error("Limit harus antara 1-100");
     }
 
-    // ✅ Gunakan getKontenForPublic untuk pagination yang lebih efisien
-    if (status === StatusKonten.PUBLISHED && !kategoriId) {
+    // Gunakan getKontenForPublic untuk konten published tanpa filter kategori
+    if (status === "PUBLISHED" && !kategoriId) {
       const offset = (page - 1) * limit;
       const data = await getKontenForPublicService(limit, offset);
 
-      // Untuk total count, perlu query terpisah atau modifikasi service
+      // Untuk total count, ambil dari service getTotalKontenPublished
+      const total = await getTotalKontenPublishedService();
+
       return {
         data,
         pagination: {
           page,
           limit,
-          total: data.length, // Temporary - perlu implementasi count yang proper
-          totalPages: Math.ceil(data.length / limit),
-          hasNext: data.length === limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+          hasNext: data.length === limit && offset + limit < total,
           hasPrev: page > 1,
         },
       };
     }
 
-    // Fallback ke implementasi lama untuk kasus lain
-    let data;
+    // Fallback untuk kasus lain
+    let data: KontenData[];
 
     if (kategoriId) {
       data = await getKontenByKategoriService(kategoriId);
@@ -490,7 +597,7 @@ export async function getKontenWithPagination(
       data = data.filter((konten) => konten.status === status);
     }
 
-    // Implementasi pagination sederhana
+    // Implementasi pagination
     const startIndex = (page - 1) * limit;
     const endIndex = startIndex + limit;
     const paginatedData = data.slice(startIndex, endIndex);
@@ -508,14 +615,23 @@ export async function getKontenWithPagination(
     };
   } catch (error) {
     console.error("Server Action - Error pagination konten:", error);
-    throw new Error("Gagal mengambil konten dengan pagination");
+    throw new Error(
+      error instanceof Error ? error.message : "Gagal mengambil konten dengan pagination"
+    );
   }
+}
+
+interface BulkUpdateResult {
+  success: number;
+  total: number;
+  failed: number;
+  errors?: Array<{ id: number; error: string }>;
 }
 
 export async function bulkUpdateKontenStatus(
   kontenIds: number[],
-  status: StatusKonten
-) {
+  status: string
+): Promise<BulkUpdateResult> {
   try {
     if (!kontenIds || kontenIds.length === 0) {
       throw new Error("ID konten tidak boleh kosong");
@@ -525,8 +641,9 @@ export async function bulkUpdateKontenStatus(
       throw new Error("Status tidak boleh kosong");
     }
 
-    // Validasi status adalah nilai enum yang valid
-    if (!Object.values(StatusKonten).includes(status)) {
+    // Validasi status adalah nilai yang valid
+    const validStatuses = ["DRAFT", "REVIEWED", "PUBLISHED", "ARCHIVED"];
+    if (!validStatuses.includes(status)) {
       throw new Error("Status tidak valid");
     }
 
@@ -537,7 +654,7 @@ export async function bulkUpdateKontenStatus(
     for (const id of kontenIds) {
       try {
         const result = await updateKontenWithOptionalFotoService(id, {
-          status,
+          status: status as any, // Cast to StatusKonten enum
         });
         results.push(result);
       } catch (error) {
@@ -557,6 +674,8 @@ export async function bulkUpdateKontenStatus(
     };
   } catch (error) {
     console.error("Server Action - Error bulk update status:", error);
-    throw new Error("Gagal melakukan bulk update status");
+    throw new Error(
+      error instanceof Error ? error.message : "Gagal melakukan bulk update status"
+    );
   }
 }

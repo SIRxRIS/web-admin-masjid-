@@ -37,3 +37,7 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+
+# env files (can opt-in for committing if needed)
+.env*
+.env.local

@@ -11,8 +11,9 @@ import {
   DonaturData, 
   KotakAmalData, 
   DonasiKhususData, 
-  KotakAmalMasjidData 
-} from "@/components/admin/layout/finance/pemasukan/table-donation/schema";
+  KotakAmalMasjidData,
+  KotakAmalJumatData 
+} from "@/lib/schema/pemasukan/schema";
 
 // Server Action untuk mengintegrasikan semua data donasi
 export async function getIntegratedData(
@@ -20,6 +21,7 @@ export async function getIntegratedData(
   kotakAmalData: KotakAmalData[],
   donasiKhususData: DonasiKhususData[],
   kotakAmalMasjidData: KotakAmalMasjidData[],
+  kotakAmalJumatData: KotakAmalJumatData[],
   year: string
 ): Promise<IntegratedData[]> {
   try {
@@ -32,6 +34,7 @@ export async function getIntegratedData(
       kotakAmalData,
       donasiKhususData,
       kotakAmalMasjidData,
+      kotakAmalJumatData,
       year
     );
 
@@ -44,12 +47,13 @@ export async function getIntegratedData(
 
 // Server Action untuk mendapatkan detail sumber data
 export async function getSourceDataDetail(
-  sourceType: 'donatur' | 'kotakAmal' | 'donasiKhusus' | 'kotakAmalMasjid',
+  sourceType: 'donatur' | 'kotakAmal' | 'donasiKhusus' | 'kotakAmalMasjid' | 'kotakAmalJumat',
   sourceId: number,
   donaturData: DonaturData[],
   kotakAmalData: KotakAmalData[],
   donasiKhususData: DonasiKhususData[],
-  kotakAmalMasjidData: KotakAmalMasjidData[]
+  kotakAmalMasjidData: KotakAmalMasjidData[],
+  kotakAmalJumatData: KotakAmalJumatData[]
 ) {
   try {
     if (!sourceType || sourceId === undefined) {
@@ -62,7 +66,8 @@ export async function getSourceDataDetail(
       donaturData,
       kotakAmalData,
       donasiKhususData,
-      kotakAmalMasjidData
+      kotakAmalMasjidData,
+      kotakAmalJumatData
     );
 
     return sourceDetail;
@@ -78,7 +83,8 @@ export async function updateIntegratedDataAction(
   donaturData: DonaturData[],
   kotakAmalData: KotakAmalData[],
   donasiKhususData: DonasiKhususData[],
-  kotakAmalMasjidData: KotakAmalMasjidData[]
+  kotakAmalMasjidData: KotakAmalMasjidData[],
+  kotakAmalJumatData: KotakAmalJumatData[]
 ) {
   try {
     if (!updatedItem) {
@@ -90,7 +96,8 @@ export async function updateIntegratedDataAction(
       donaturData,
       kotakAmalData,
       donasiKhususData,
-      kotakAmalMasjidData
+      kotakAmalMasjidData,
+      kotakAmalJumatData
     );
 
     return result;
@@ -106,6 +113,7 @@ export async function validateIntegrationData(
   kotakAmalData: KotakAmalData[],
   donasiKhususData: DonasiKhususData[],
   kotakAmalMasjidData: KotakAmalMasjidData[],
+  kotakAmalJumatData: KotakAmalJumatData[],
   year: string
 ): Promise<{
   isValid: boolean;
@@ -148,6 +156,15 @@ export async function validateIntegrationData(
 
     if (validKotakAmalMasjid.length === 0) {
       warnings.push("Tidak ada data kotak amal masjid untuk tahun ini");
+    }
+
+    // Validasi data kotak amal jumat berdasarkan tahun
+    const validKotakAmalJumat = kotakAmalJumatData.filter(item => {
+      return item.tahun.toString() === year;
+    });
+
+    if (validKotakAmalJumat.length === 0) {
+      warnings.push("Tidak ada data kotak amal jumat untuk tahun ini");
     }
 
     // Validasi konsistensi data

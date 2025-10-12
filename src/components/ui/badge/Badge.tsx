@@ -1,6 +1,7 @@
+// src/components/ui/badge/Badge.tsx
 import React from "react";
 
-type BadgeVariant = "light" | "solid";
+type BadgeVariant = "light" | "solid" | "outline" | "default" | "secondary";
 type BadgeSize = "sm" | "md";
 type BadgeColor =
   | "primary"
@@ -18,6 +19,7 @@ interface BadgeProps {
   startIcon?: React.ReactNode; // Icon at the start
   endIcon?: React.ReactNode; // Icon at the end
   children: React.ReactNode; // Badge content
+  className?: string; // Additional CSS classes
 }
 
 const Badge: React.FC<BadgeProps> = ({
@@ -27,6 +29,7 @@ const Badge: React.FC<BadgeProps> = ({
   startIcon,
   endIcon,
   children,
+  className = "",
 }) => {
   const baseStyles =
     "inline-flex items-center px-2.5 py-0.5 justify-center gap-1 rounded-full font-medium";
@@ -61,6 +64,33 @@ const Badge: React.FC<BadgeProps> = ({
       light: "bg-gray-400 dark:bg-white/5 text-white dark:text-white/80",
       dark: "bg-gray-700 text-white dark:text-white",
     },
+    outline: {
+      primary: "border border-brand-200 text-brand-600 bg-transparent dark:border-brand-500/30 dark:text-brand-400",
+      success: "border border-success-200 text-success-600 bg-transparent dark:border-success-500/30 dark:text-success-500",
+      error: "border border-error-200 text-error-600 bg-transparent dark:border-error-500/30 dark:text-error-500",
+      warning: "border border-warning-200 text-warning-600 bg-transparent dark:border-warning-500/30 dark:text-orange-400",
+      info: "border border-blue-light-200 text-blue-light-600 bg-transparent dark:border-blue-light-500/30 dark:text-blue-light-500",
+      light: "border border-gray-200 text-gray-600 bg-transparent dark:border-white/20 dark:text-white/80",
+      dark: "border border-gray-600 text-gray-700 bg-transparent dark:border-white/20 dark:text-white",
+    },
+    default: {
+      primary: "bg-brand-500 text-white dark:text-white",
+      success: "bg-success-500 text-white dark:text-white",
+      error: "bg-error-500 text-white dark:text-white",
+      warning: "bg-warning-500 text-white dark:text-white",
+      info: "bg-blue-light-500 text-white dark:text-white",
+      light: "bg-gray-600 text-white dark:text-white",
+      dark: "bg-gray-800 text-white dark:text-white",
+    },
+    secondary: {
+      primary: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200",
+      success: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200",
+      error: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200",
+      warning: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200",
+      info: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200",
+      light: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200",
+      dark: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200",
+    },
   };
 
   // Get styles based on size and color variant
@@ -68,7 +98,7 @@ const Badge: React.FC<BadgeProps> = ({
   const colorStyles = variants[variant][color];
 
   return (
-    <span className={`${baseStyles} ${sizeClass} ${colorStyles}`}>
+    <span className={`${baseStyles} ${sizeClass} ${colorStyles} ${className}`}>
       {startIcon && <span className="mr-1">{startIcon}</span>}
       {children}
       {endIcon && <span className="ml-1">{endIcon}</span>}

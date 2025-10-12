@@ -14,12 +14,12 @@ type ProfileData = {
 export async function setupProfile(data: ProfileData) {
   const supabase = await createServerSupabaseClient();
 
-  // Cek session
+  // Cek user (lebih aman daripada session)
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (!user) {
     return { error: "Tidak terautentikasi" };
   }
 
@@ -27,7 +27,7 @@ export async function setupProfile(data: ProfileData) {
   const { data: existingProfile } = await supabase
     .from("Profile")
     .select("id")
-    .eq("userId", session.user.id)
+    .eq("userId", user.id)
     .single();
 
   if (existingProfile) {
@@ -38,7 +38,7 @@ export async function setupProfile(data: ProfileData) {
   const { data: profile, error } = await supabase
     .from("Profile")
     .insert({
-      userId: session.user.id,
+      userId: user.id,
       ...data,
     })
     .select()
@@ -55,12 +55,12 @@ export async function setupProfile(data: ProfileData) {
 export async function updateProfile(id: string, data: Partial<ProfileData>) {
   const supabase = await createServerSupabaseClient();
 
-  // Cek session
+  // Cek user (lebih aman daripada session)
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (!user) {
     return { error: "Tidak terautentikasi" };
   }
 
@@ -76,12 +76,12 @@ export async function updateProfile(id: string, data: Partial<ProfileData>) {
   }
 
   // Cek apakah user adalah pemilik profil atau admin
-  if (profile.userId !== session.user.id) {
+  if (profile.userId !== user.id) {
     // Cek apakah user adalah admin
     const { data: currentUserProfile } = await supabase
       .from("Profile")
       .select("role")
-      .eq("userId", session.user.id)
+      .eq("userId", user.id)
       .single();
 
     if (!currentUserProfile || currentUserProfile.role !== "ADMIN") {
@@ -108,12 +108,12 @@ export async function updateProfile(id: string, data: Partial<ProfileData>) {
 export async function uploadProfilePhoto(id: string, file: File) {
   const supabase = await createServerSupabaseClient();
 
-  // Cek session
+  // Cek user (lebih aman daripada session)
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (!user) {
     return { error: "Tidak terautentikasi" };
   }
 
@@ -135,12 +135,12 @@ export async function uploadProfilePhoto(id: string, file: File) {
     }
 
     // Cek apakah user adalah pemilik profil atau admin
-    if (profile.userId !== session.user.id) {
+    if (profile.userId !== user.id) {
       // Cek apakah user adalah admin
       const { data: currentUserProfile } = await supabase
         .from("Profile")
         .select("role")
-        .eq("userId", session.user.id)
+        .eq("userId", user.id)
         .single();
 
       if (!currentUserProfile || currentUserProfile.role !== "ADMIN") {

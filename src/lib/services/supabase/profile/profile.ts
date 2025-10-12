@@ -1,11 +1,12 @@
 // src/lib/services/supabase/profile/profile.ts
-import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { ProfileData } from "@/components/admin/layout/profile/schema";
+import { supabaseAdmin } from "@/lib/supabase/admin";
+import { ProfileData } from "@/lib/schema/profile/schema";
+import { v4 as uuidv4 } from 'uuid';
 
 export async function getProfiles(
   isComplete?: boolean
 ): Promise<ProfileData[]> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
   let query = supabase
     .from("profile")
@@ -27,7 +28,7 @@ export async function getProfiles(
 }
 
 export async function getProfileById(id: string): Promise<ProfileData | null> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
   const { data, error } = await supabase
     .from("profile")
@@ -46,7 +47,7 @@ export async function getProfileById(id: string): Promise<ProfileData | null> {
 export async function getProfileByUserId(
   userId: string
 ): Promise<ProfileData | null> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
   const { data, error } = await supabase
     .from("profile")
@@ -65,7 +66,7 @@ export async function getProfileByUserId(
 export async function createProfile(
   profileData: Omit<ProfileData, "id" | "createdAt" | "updatedAt">
 ): Promise<ProfileData> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
   const now = new Date();
 
@@ -73,6 +74,7 @@ export async function createProfile(
     .from("profile")
     .insert([
       {
+        id: uuidv4(),
         ...profileData,
         createdAt: now.toISOString(),
         updatedAt: now.toISOString(),
@@ -93,7 +95,7 @@ export async function updateProfile(
   id: string,
   updateData: Partial<Omit<ProfileData, "id" | "createdAt">>
 ): Promise<ProfileData> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
   const { data, error } = await supabase
     .from("profile")
@@ -117,7 +119,7 @@ export async function updateProfileByUserId(
   userId: string,
   updateData: Partial<Omit<ProfileData, "id" | "userId" | "createdAt">>
 ): Promise<ProfileData> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
   const { data, error } = await supabase
     .from("profile")
@@ -141,7 +143,7 @@ export async function toggleProfileComplete(
   id: string,
   isComplete: boolean
 ): Promise<ProfileData> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
   const { data, error } = await supabase
     .from("profile")
@@ -161,8 +163,8 @@ export async function toggleProfileComplete(
   return data;
 }
 
-export async function deleteProfile(id: string): Promise<boolean> {
-  const supabase = await createServerSupabaseClient();
+export async function deleteProfile(id: string): Promise<void> {
+  const supabase = supabaseAdmin;
 
   const { error } = await supabase.from("profile").delete().eq("id", id);
 
@@ -170,12 +172,24 @@ export async function deleteProfile(id: string): Promise<boolean> {
     console.error("Error menghapus profile:", error);
     throw new Error("Gagal menghapus profile");
   }
+}
 
-  return true;
+export async function deleteProfileByUserId(userId: string): Promise<void> {
+  const supabase = supabaseAdmin;
+
+  const { error } = await supabase
+    .from("profile")
+    .delete()
+    .eq("userId", userId);
+
+  if (error) {
+    console.error("Error menghapus profile by userId:", error);
+    throw new Error("Gagal menghapus profile");
+  }
 }
 
 export async function getProfilesByRole(role: string): Promise<ProfileData[]> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
   const { data, error } = await supabase
     .from("profile")
@@ -194,7 +208,7 @@ export async function getProfilesByRole(role: string): Promise<ProfileData[]> {
 export async function getProfilesByJabatan(
   jabatan: string
 ): Promise<ProfileData[]> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
   const { data, error } = await supabase
     .from("profile")
@@ -213,20 +227,105 @@ export async function getProfilesByJabatan(
 export async function searchProfiles(
   searchTerm: string
 ): Promise<ProfileData[]> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
   const { data, error } = await supabase
     .from("profile")
     .select("*")
     .or(
-      `nama.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%,alamat.ilike.%${searchTerm}%`
-    )
-    .order("nama", { ascending: true });
+      `name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,jabatan.ilike.%${searchTerm}%`
+    );
 
   if (error) {
-    console.error("Error mencari profile:", error);
-    throw new Error("Gagal mencari profile");
+    console.error("Error searching profiles:", error);
+    throw new Error("Gagal mencari profiles");
   }
 
   return data || [];
+}
+
+// API CLIENT FUNCTIONS - Menggunakan supabase admin melalui API endpoint
+
+export async function createProfileViaAPI(
+  profileData: Omit<ProfileData, "id" | "createdAt" | "updatedAt">
+): Promise<ProfileData> {
+  try {
+    const response = await fetch('/api/profile', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(profileData),
+    });
+
+    const result = await response.json();
+
+    if (!result.success) {
+      throw new Error(result.message || 'Gagal membuat profile');
+    }
+
+    return result.data;
+  } catch (error) {
+    console.error("Error membuat profile via API:", error);
+    throw new Error("Gagal membuat profile");
+  }
+}
+
+export async function getProfileByUserIdViaAPI(
+  userId: string
+): Promise<ProfileData | null> {
+  try {
+    const response = await fetch(`/api/profile?userId=${userId}`);
+    const result = await response.json();
+
+    if (!result.success) {
+      return null;
+    }
+
+    return result.data?.[0] || null;
+  } catch (error) {
+    console.error("Error mengambil profile via API:", error);
+    return null;
+  }
+}
+
+// ADMIN FUNCTIONS - Menggunakan supabase admin langsung (untuk server-side)
+
+export async function createProfileAdmin(
+  profileData: Omit<ProfileData, "id" | "createdAt" | "updatedAt">
+): Promise<ProfileData> {
+  const supabase = supabaseAdmin;
+
+  const { data, error } = await supabase
+    .from("profile")
+    .insert([{
+      id: uuidv4(),
+      ...profileData
+    }])
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Error membuat profile dengan admin:", error);
+    throw new Error("Gagal membuat profile");
+  }
+
+  return data;
+}
+
+export async function getProfileByUserIdAdmin(
+  userId: string
+): Promise<ProfileData | null> {
+  const { data, error } = await supabaseAdmin
+    .from("profile")
+    .select("*")
+    .eq("userId", userId)
+    .single();
+
+  if (error) {
+    console.error("Error mengambil profile by userId dengan admin:", error);
+    return null;
+  }
+
+  return data;
 }

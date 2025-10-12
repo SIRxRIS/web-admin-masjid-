@@ -1,13 +1,7 @@
 "use client";
 import React from "react";
-
 import { ApexOptions } from "apexcharts";
-
-import dynamic from "next/dynamic";
-// Dynamically import the ReactApexChart component
-const ReactApexChart = dynamic(() => import("react-apexcharts"), {
-  ssr: false,
-});
+import ApexChartWrapper from "../ApexChartWrapper";
 
 export default function LineChartOne() {
   const options: ApexOptions = {
@@ -121,7 +115,7 @@ export default function LineChartOne() {
   return (
     <div className="max-w-full overflow-x-auto custom-scrollbar">
       <div id="chartEight" className="min-w-[1000px]">
-        <ReactApexChart
+        <ApexChartWrapper
           options={options}
           series={series}
           type="area"

@@ -1,4 +1,4 @@
-import { DonaturData, KotakAmalData, DonasiKhususData, KotakAmalMasjidData } from "@/components/admin/layout/finance/pemasukan/table-donation/schema";
+import { DonaturData, KotakAmalData, DonasiKhususData, KotakAmalMasjidData, KotakAmalJumatData } from "@/lib/schema/pemasukan/schema";
 
 export type IntegratedData = {
   id: number;
@@ -19,7 +19,7 @@ export type IntegratedData = {
   des: number;
   infaq: number;
   total: number;
-  sourceType: 'donatur' | 'kotakAmal' | 'donasiKhusus' | 'kotakAmalMasjid';
+  sourceType: 'donatur' | 'kotakAmal' | 'donasiKhusus' | 'kotakAmalMasjid' | 'kotakAmalJumat';
   sourceId: number;
 };
 
@@ -28,6 +28,7 @@ export function integrateData(
   kotakAmalData: KotakAmalData[],
   donasiKhususData: DonasiKhususData[],
   kotakAmalMasjidData: KotakAmalMasjidData[],
+  kotakAmalJumatData: KotakAmalJumatData[],
   year: string
 ): IntegratedData[] {
   const result: IntegratedData[] = [];
@@ -38,6 +39,10 @@ export function integrateData(
   });
   
   const filteredKotakAmalMasjid = kotakAmalMasjidData.filter(item => {
+    return item.tahun.toString() === year;
+  });
+  
+  const filteredKotakAmalJumat = kotakAmalJumatData.filter(item => {
     return item.tahun.toString() === year;
   });
   
@@ -161,6 +166,47 @@ export function integrateData(
     sourceId: 0 // ID gabungan untuk semua kotak amal masjid
   });
   
+  // Proses data kotak amal jumat 
+  const kotakAmalJumatByMonth: Record<string, number> = {
+    jan: 0, feb: 0, mar: 0, apr: 0, mei: 0, jun: 0,
+    jul: 0, aug: 0, sep: 0, okt: 0, nov: 0, des: 0
+  };
+  
+  filteredKotakAmalJumat.forEach(item => {
+    const tanggal = item.tanggal instanceof Date ? item.tanggal : new Date(item.tanggal);
+    const bulan = tanggal.getMonth();
+    const monthNames = ['jan', 'feb', 'mar', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'des'];
+    const monthKey = monthNames[bulan];
+    
+    kotakAmalJumatByMonth[monthKey] += item.jumlah;
+  });
+  
+  // Menambahkan total kotak amal jumat ke hasil integrasi
+  const totalKotakAmalJumat = Object.values(kotakAmalJumatByMonth).reduce((sum, val) => sum + val, 0);
+  
+  result.push({
+    id: result.length + 1,
+    no: result.length + 1,
+    nama: "Kotak Amal Jumat",
+    alamat: "Masjid",
+    jan: kotakAmalJumatByMonth.jan,
+    feb: kotakAmalJumatByMonth.feb,
+    mar: kotakAmalJumatByMonth.mar,
+    apr: kotakAmalJumatByMonth.apr,
+    mei: kotakAmalJumatByMonth.mei,
+    jun: kotakAmalJumatByMonth.jun,
+    jul: kotakAmalJumatByMonth.jul,
+    aug: kotakAmalJumatByMonth.aug,
+    sep: kotakAmalJumatByMonth.sep,
+    okt: kotakAmalJumatByMonth.okt,
+    nov: kotakAmalJumatByMonth.nov,
+    des: kotakAmalJumatByMonth.des,
+    infaq: 0,
+    total: totalKotakAmalJumat,
+    sourceType: 'kotakAmalJumat',
+    sourceId: 0 // ID gabungan untuk semua kotak amal jumat
+  });
+  
   const donasiByMonth: Record<string, number> = {
     jan: 0, feb: 0, mar: 0, apr: 0, mei: 0, jun: 0,
     jul: 0, aug: 0, sep: 0, okt: 0, nov: 0, des: 0
@@ -236,12 +282,13 @@ export function integrateData(
 }
 
 export function getSourceDetail(
-  sourceType: 'donatur' | 'kotakAmal' | 'donasiKhusus' | 'kotakAmalMasjid',
+  sourceType: 'donatur' | 'kotakAmal' | 'donasiKhusus' | 'kotakAmalMasjid' | 'kotakAmalJumat',
   sourceId: number,
   donaturData: DonaturData[],
   kotakAmalData: KotakAmalData[],
   donasiKhususData: DonasiKhususData[],
-  kotakAmalMasjidData: KotakAmalMasjidData[]
+  kotakAmalMasjidData: KotakAmalMasjidData[],
+  kotakAmalJumatData: KotakAmalJumatData[]
 ) {
   switch (sourceType) {
     case 'donatur':
@@ -252,6 +299,8 @@ export function getSourceDetail(
       return donasiKhususData.filter(item => item.id === sourceId);
     case 'kotakAmalMasjid':
       return kotakAmalMasjidData.filter(item => item.tahun === parseInt(sourceId.toString()));
+    case 'kotakAmalJumat':
+      return kotakAmalJumatData.filter(item => item.tahun === parseInt(sourceId.toString()));
     default:
       return null;
   }
@@ -262,7 +311,8 @@ export function updateIntegratedData(
   donaturData: DonaturData[],
   kotakAmalData: KotakAmalData[],
   donasiKhususData: DonasiKhususData[],
-  kotakAmalMasjidData: KotakAmalMasjidData[]
+  kotakAmalMasjidData: KotakAmalMasjidData[],
+  kotakAmalJumatData: KotakAmalJumatData[]
 ) {
   const { sourceType, sourceId } = updatedItem;
   
@@ -270,6 +320,7 @@ export function updateIntegratedData(
   let updatedKotakAmalData = [...kotakAmalData];
   let updatedDonasiKhususData = [...donasiKhususData];
   let updatedKotakAmalMasjidData = [...kotakAmalMasjidData];
+  let updatedKotakAmalJumatData = [...kotakAmalJumatData];
   
   switch (sourceType) {
     case 'donatur':
@@ -327,6 +378,7 @@ export function updateIntegratedData(
     updatedDonaturData,
     updatedKotakAmalData,
     updatedDonasiKhususData,
-    updatedKotakAmalMasjidData
+    updatedKotakAmalMasjidData,
+    updatedKotakAmalJumatData
   };
 }

@@ -4,16 +4,16 @@
 import { format } from "date-fns";
 import {
   getKotakAmalMasjidData as getKotakAmalMasjidDataService,
-  createKotakAmal as createKotakAmalService,
-  updateKotakAmal as updateKotakAmalService,
-  deleteKotakAmal as deleteKotakAmalService,
+  createKotakAmalMasjid as createKotakAmalService,
+  updateKotakAmalMasjid as updateKotakAmalService,
+  deleteKotakAmalMasjid as deleteKotakAmalService,
   getTotalKotakAmalMasjid as getTotalKotakAmalMasjidService,
   getKotakAmalMasjidTahunan as getKotakAmalMasjidTahunanService,
   getKotakAmalMasjidTahunanByDate as getKotakAmalMasjidTahunanByDateService,
   getKotakAmalMasjidBulanan as getKotakAmalMasjidBulananService,
   getAvailableTahun as getAvailableTahunService,
 } from "@/lib/services/supabase/kotak-amal-masjid";
-import { KotakAmalMasjidData } from "@/components/admin/layout/finance/pemasukan/table-donation/schema";
+import { KotakAmalMasjidData } from "@/lib/schema/pemasukan/schema";
 
 // Types untuk server actions response
 interface ActionResponse<T = any> {

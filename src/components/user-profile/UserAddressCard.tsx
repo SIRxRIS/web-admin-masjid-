@@ -279,7 +279,7 @@ export default function UserAddress() {
                       ref={stateRef}
                       type="text"
                       name="state"
-                      placeholder="Masukkan provinsi atau negara bagian"
+                      placeholder="Masukkan nama kecamatan"
                       className={inputClassName}
                     />
                   </div>

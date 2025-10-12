@@ -11,6 +11,12 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: '*.googleusercontent.com', // Wildcard untuk subdomain Google
+      },
+      // Tambahkan hostname Supabase untuk storage images
+      {
+        protocol: 'https',
+        hostname: 'scszbqgumyvtbdlnebdq.supabase.co', // Supabase storage domain
+        pathname: '/storage/v1/object/public/**', // Path untuk public storage
       }
     ],
   },

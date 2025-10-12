@@ -38,42 +38,44 @@ model Profile {
 
   addedWhitelist EmailWhitelist[] @relation("ProfileToEmailWhitelist")
 
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @default(now()) @updatedAt
-  activities UserActivity[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @default(now()) @updatedAt
+  activities  UserActivity[]
   permissions UserPermission[]
-  
+
   @@map("profile")
 }
 
 enum Jabatan {
-  DEVELOPER   @map("DEVELOPER")
-  MAINTENANCE @map("MAINTENANCE")
-  PENASEHAT   @map("PENASEHAT")
-  KETUA       @map("KETUA")
-  SEKRETARIS  @map("SEKRETARIS")
-  BENDAHARA   @map("BENDAHARA")
-  KOORDINATOR @map("KOORDINATOR")
-  PENGURUS    @map("PENGURUS")
+  DEVELOPER     @map("DEVELOPER")
+  MAINTENANCE   @map("MAINTENANCE")
+  KETUA         @map("KETUA")
+  SEKRETARIS    @map("SEKRETARIS")
+  BENDAHARA     @map("BENDAHARA")
+  PENGURUS      @map("PENGURUS")
+  HUMAS         @map("HUMAS")
+  REMAS         @map("REMAS")
+  MAJLIS_TALIM  @map("MAJLIS_TALIM")
 
   @@map("Jabatan")
 }
 
 enum Role {
-  SUPER_ADMIN @map("SUPER_ADMIN")
-  ADMIN       @map("ADMIN")
-  FINANCE     @map("FINANCE")
-  CONTENT     @map("CONTENT")
-  VIEWER      @map("VIEWER")
-  MANAGEMENT  @map("MANAGEMENT")
-  INVENTORY   @map("INVENTORY")
+  ADMIN                 @map("ADMIN")
+  KETUA                 @map("KETUA")
+  SEKRETARIS            @map("SEKRETARIS")
+  BENDAHARA             @map("BENDAHARA")
+  PENGURUS              @map("PENGURUS")
+  HUMAS_MEDIA           @map("HUMAS_MEDIA")
+  REMAS_ADMIN           @map("REMAS_ADMIN")
+  MAJLIS_TALIM_ADMIN    @map("MAJLIS_TALIM_ADMIN")
 
   @@map("Role")
 }
 
 model UserActivity {
   id        String   @id @default(uuid())
-  profileId String @db.Uuid
+  profileId String   @db.Uuid
   profile   Profile  @relation(fields: [profileId], references: [id])
   action    String // LOGIN, LOGOUT, UPDATE_PROFILE, dll
   details   Json? // Detail tambahan
@@ -84,7 +86,7 @@ model UserActivity {
 
 model UserPermission {
   id         String     @id @default(uuid())
-  profileId  String @db.Uuid
+  profileId  String     @db.Uuid
   profile    Profile    @relation(fields: [profileId], references: [id])
   resource   Resource // Menggunakan enum Resource
   permission Permission // Menggunakan enum Permission
@@ -133,7 +135,6 @@ model Donatur {
   updatedAt DateTime @default(now()) @updatedAt
 
   konten    Konten[]
-  pemasukan Pemasukan[]
 }
 
 model KotakAmal {
@@ -156,7 +157,6 @@ model KotakAmal {
   des       Int      @default(0)
   createdAt DateTime @default(now())
 
-  pemasukan Pemasukan[]
   konten    Konten[]
 }
 
@@ -166,8 +166,14 @@ model KotakAmalMasjid {
   jumlah    Int
   tahun     Int
   createdAt DateTime @default(now())
+}
 
-  pemasukan Pemasukan[]
+model KotakAmalJumat {
+  id        Int      @id @default(autoincrement())
+  tanggal   DateTime
+  jumlah    Int
+  tahun     Int
+  createdAt DateTime @default(now())
 }
 
 model DonasiKhusus {
@@ -180,34 +186,6 @@ model DonasiKhusus {
   keterangan String
   createdAt  DateTime @default(now())
 
-  pemasukan Pemasukan[]
-}
-
-model Pemasukan {
-  id             Int             @id @default(autoincrement())
-  tanggal        DateTime
-  sumber         SumberPemasukan
-  jumlah         Int
-  keterangan     String          @default("")
-  tahun          Int
-  donaturId      Int? // opsional
-  donasiKhususId Int? // opsional
-  kotakAmalId    Int? // opsional
-  kotakMasjidId  Int? // opsional
-  createdAt      DateTime        @default(now())
-
-  donatur      Donatur?         @relation(fields: [donaturId], references: [id])
-  donasiKhusus DonasiKhusus?    @relation(fields: [donasiKhususId], references: [id])
-  kotakAmal    KotakAmal?       @relation(fields: [kotakAmalId], references: [id])
-  kotakMasjid  KotakAmalMasjid? @relation(fields: [kotakMasjidId], references: [id])
-}
-
-enum SumberPemasukan {
-  DONATUR
-  KOTAK_AMAL_LUAR
-  KOTAK_AMAL_MASJID
-  DONASI_KHUSUS
-  LAINNYA
 }
 
 model Pengeluaran {
@@ -228,6 +206,7 @@ model Pengurus {
   nama      String
   jabatan   String
   periode   String
+  kategori  String   @default("MASJID") // MASJID, REMAS, MAJLIS_TALIM
   fotoUrl   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now())
@@ -250,9 +229,9 @@ model KategoriKonten {
 
 // Model utama untuk konten masjid
 model Konten {
-  id                 Int            @id @default(autoincrement())
+  id                 Int          @id @default(autoincrement())
   judul              String
-  slug               String         @unique
+  slug               String       @unique
   deskripsi          String
   tanggal            DateTime
   waktu              String?
@@ -261,18 +240,20 @@ model Konten {
   kategoriId         Int
   donaturId          Int?
   kotakAmalId        Int?
-  penting            Boolean        @default(false)
-  tampilkanDiBeranda Boolean        @default(true)
-  status             StatusKonten   @default(PUBLISHED)
-  viewCount          Int            @default(0)
+  penting            Boolean      @default(false)
+  tampilkanDiBeranda Boolean      @default(true)
+  status             StatusKonten @default(PUBLISHED)
+  viewCount          Int          @default(0)
   fotoUrl            String?
-  createdAt          DateTime       @default(now())
-  updatedAt          DateTime       @default(now())
-  kategori           KategoriKonten @relation(fields: [kategoriId], references: [id])
-  donatur            Donatur?       @relation(fields: [donaturId], references: [id])
-  kotakAmal          KotakAmal?     @relation(fields: [kotakAmalId], references: [id])
-  gambar             GambarKonten[]
-  tags               TagKonten[]
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @default(now())
+
+  // Relasi
+  kategori   KategoriKonten    @relation(fields: [kategoriId], references: [id])
+  donatur    Donatur?          @relation(fields: [donaturId], references: [id])
+  kotakAmal  KotakAmal?        @relation(fields: [kotakAmalId], references: [id])
+  gambar     GambarKonten[]
+  kontenTags KontenTagKonten[]
 
   @@map("konten")
 }
@@ -300,9 +281,27 @@ model TagKonten {
   slug      String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now())
-  konten    Konten[]
+
+  kontenTags KontenTagKonten[]
 
   @@map("tag_konten")
+}
+
+// Junction table untuk many-to-many relation antara Konten dan TagKonten
+model KontenTagKonten {
+  id        Int      @id @default(autoincrement())
+  kontenId  Int
+  tagId     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+
+  // Relasi
+  konten    Konten    @relation(fields: [kontenId], references: [id], onDelete: Cascade)
+  tagKonten TagKonten @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  // Pastikan kombinasi kontenId dan tagId unik
+  @@unique([kontenId, tagId])
+  @@map("konten_tag_konten")
 }
 
 // Enum untuk status konten
@@ -362,4 +361,126 @@ model Inventaris {
   keterangan   String?
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @default(now())
+}
+
+model TargetPemasukan {
+  id         Int      @id @default(autoincrement())
+  tahun      Int
+  bulan      Int
+  target     BigInt
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@unique([tahun, bulan])
+  @@map("target_pemasukan")
+}
+
+enum KategoriVisiMisi {
+  MASJID
+  REMAS
+  MAJLIS_TALIM
+}
+
+enum JenisVisiMisi {
+  VISI
+  MISI
+}
+
+model VisiMisi {
+  id        Int              @id @default(autoincrement())
+  kategori  KategoriVisiMisi
+  jenis     JenisVisiMisi
+  konten    String           @db.Text
+  divisi    String?          // Divisi/Seksi - nullable untuk backward compatibility
+  urutan    Int              @default(1)
+  isActive  Boolean          @default(true)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@unique([kategori, jenis, divisi, urutan])
+  @@map("visi_misi")
+}
+
+model SiteConfiguration {
+  id          String   @id @default(uuid()) @db.Uuid
+  key         String   @unique
+  value       String   @db.Text
+  description String?
+  category    String   @default("general")
+  dataType    String   @default("string") // string, number, boolean, json
+  isPublic    Boolean  @default(false)
+  updatedBy   String?  @db.Uuid
+  updatedAt   DateTime @default(now()) @updatedAt
+  createdAt   DateTime @default(now())
+
+  @@index([category])
+  @@index([isPublic])
+  @@map("site_configuration")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String?  @db.Uuid
+  userEmail   String?
+  action      String   // CREATE, UPDATE, DELETE
+  tableName   String   // Table/model name that was affected
+  recordId    String?  // ID of the affected record
+  oldValues   Json?    // Previous values (for UPDATE/DELETE)
+  newValues   Json?    // New values (for CREATE/UPDATE)
+  ipAddress   String?
+  userAgent   String?
+  timestamp   DateTime @default(now())
+  description String?  // Human readable description
+
+  @@index([userId])
+  @@index([tableName])
+  @@index([action])
+  @@index([timestamp])
+  @@map("audit_log")
+}
+
+// Model untuk sistem notifikasi berbasis role
+model Notification {
+  id          String             @id @default(uuid()) @db.Uuid
+  title       String
+  message     String             @db.Text
+  type        NotificationType
+  priority    NotificationPriority @default(MEDIUM)
+  targetRoles Role[]             // Array role yang akan menerima notifikasi
+  actionUrl   String?            // URL untuk action button (optional)
+  relatedId   String?            // ID record terkait (optional)
+  relatedTable String?           // Nama tabel terkait (optional)
+  isRead      Boolean            @default(false)
+  readBy      String[]           @default([]) // Array user IDs yang sudah membaca
+  createdBy   String?            @db.Uuid
+  expiresAt   DateTime?          // Notifikasi bisa expired (optional)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@index([type])
+  @@index([priority])
+  @@index([targetRoles])
+  @@index([isRead])
+  @@index([createdAt])
+  @@index([expiresAt])
+  @@map("notifications")
+}
+
+// Enum untuk tipe notifikasi
+enum NotificationType {
+  TARGET_PEMASUKAN      // Target pemasukan tercapai/tidak tercapai
+  DONASI_BARU          // Donasi khusus baru masuk
+  KONTEN_BARU          // Konten baru ditambahkan
+  INVENTARIS_BARU      // Inventaris baru ditambahkan
+  SYSTEM_HEALTH        // System health warning
+  EMAIL_WHITELIST      // Email whitelist baru ditambahkan
+  GENERAL              // Notifikasi umum
+}
+
+// Enum untuk prioritas notifikasi
+enum NotificationPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
 }

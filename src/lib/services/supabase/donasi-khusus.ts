@@ -1,11 +1,13 @@
 // src/lib/services/supabase/donasi-khusus.ts
-import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { DonasiKhususData } from "@/components/admin/layout/finance/pemasukan/table-donation/schema";
+import { supabaseAdmin } from "@/lib/supabase/admin";
+import { DonasiKhususData } from "@/lib/schema/pemasukan/schema";
+import { syncPemasukanForDonasiKhusus } from "./pemasukan/sync-helpers";
+import { createDonasiBaruNotification } from "@/actions/notifications";
 
 export async function getDonasiKhusus(
   tahunFilter?: number
 ): Promise<DonasiKhususData[]> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
   let query = supabase
     .from("DonasiKhusus")
@@ -27,7 +29,7 @@ export async function getDonasiKhusus(
 }
 
 export async function getAvailableTahun(): Promise<number[]> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
   const { data, error } = await supabase
     .from("DonasiKhusus")
@@ -45,7 +47,7 @@ export async function getAvailableTahun(): Promise<number[]> {
 export async function getDonasiKhususById(
   id: number
 ): Promise<DonasiKhususData | null> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
   const { data, error } = await supabase
     .from("DonasiKhusus")
@@ -64,7 +66,7 @@ export async function getDonasiKhususById(
 export async function getDonasiKhususData(
   tahunFilter?: number
 ): Promise<DonasiKhususData[]> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
   let query = supabase
     .from("DonasiKhusus")
@@ -90,7 +92,7 @@ export async function createDonasiKhusus(
     tahun: number;
   }
 ): Promise<DonasiKhususData> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
   const { data: lastItem, error: lastItemError } = await supabase
     .from("DonasiKhusus")
@@ -126,6 +128,25 @@ export async function createDonasiKhusus(
     throw new Error("Gagal membuat donasi khusus");
   }
 
+  // Sync dengan tabel Pemasukan
+  try {
+    await syncPemasukanForDonasiKhusus(data.id);
+  } catch (syncError) {
+    console.error("Error sync pemasukan setelah create donasi khusus:", syncError);
+  }
+
+  // Trigger notifikasi untuk pengurus
+  try {
+    await createDonasiBaruNotification(
+      donasiKhusus.nama,
+      donasiKhusus.jumlah,
+      donasiKhusus.keterangan || "Donasi khusus"
+    );
+  } catch (notifError) {
+    console.error("Error creating donasi notification:", notifError);
+    // Jangan gagalkan proses utama jika notifikasi gagal
+  }
+
   return data;
 }
 
@@ -133,7 +154,7 @@ export async function updateDonasiKhusus(
   id: number,
   donasiKhususData: Partial<Omit<DonasiKhususData, "id" | "createdAt">>
 ): Promise<DonasiKhususData> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
   const { data, error } = await supabase
     .from("DonasiKhusus")
@@ -147,11 +168,19 @@ export async function updateDonasiKhusus(
     throw new Error("Gagal mengupdate donasi khusus");
   }
 
+  // AUTO-SYNC: Update tabel Pemasukan
+  try {
+    await syncPemasukanForDonasiKhusus(id);
+  } catch (syncError) {
+    console.error("Error sync pemasukan setelah update donasi khusus:", syncError);
+    // Tidak throw error agar update tetap berhasil
+  }
+
   return data;
 }
 
 export async function deleteDonasiKhusus(id: number): Promise<boolean> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
   try {
     const { data: donasiToDelete, error: getError } = await supabase
@@ -161,6 +190,14 @@ export async function deleteDonasiKhusus(id: number): Promise<boolean> {
       .single();
 
     if (getError) throw getError;
+
+    // AUTO-SYNC: Hapus data pemasukan terkait terlebih dahulu
+    const { error: deletePemasukanError } = await supabase
+      .from("Pemasukan")
+      .delete()
+      .eq("donasiKhususId", id);
+
+    if (deletePemasukanError) throw deletePemasukanError;
 
     const { error: deleteError } = await supabase
       .from("DonasiKhusus")
@@ -199,7 +236,7 @@ export async function updateDonasiKhususOrder(
   dataList: DonasiKhususData[],
   tahun: number
 ) {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
   const updates = dataList
     .filter((item) => item.tahun === tahun)
@@ -224,7 +261,7 @@ export async function getDonasiKhususBulanan(
   tahun: number,
   bulan: number
 ): Promise<number> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
   const start = `${tahun}-${bulan.toString().padStart(2, "0")}-01`;
   const end = new Date(tahun, bulan, 1).toISOString().split("T")[0];
@@ -240,11 +277,11 @@ export async function getDonasiKhususBulanan(
     throw new Error("Gagal mengambil total donasi khusus bulanan");
   }
 
-  return data?.reduce((total, item) => total + item.jumlah, 0) || 0;
+  return data?.reduce((total: number, item: any) => total + item.jumlah, 0) || 0;
 }
 
 export async function getDonasiKhususTahunan(tahun: number): Promise<number> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
   const { data, error } = await supabase
     .from("DonasiKhusus")
@@ -257,5 +294,5 @@ export async function getDonasiKhususTahunan(tahun: number): Promise<number> {
     throw new Error("Gagal mengambil total donasi khusus tahunan");
   }
 
-  return data?.reduce((total, item) => total + item.jumlah, 0) || 0;
+  return data?.reduce((total: number, item: any) => total + item.jumlah, 0) || 0;
 }

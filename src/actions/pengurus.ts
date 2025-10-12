@@ -1,177 +1,205 @@
 // src/actions/pengurus.ts
 "use server";
 
-import {
-  getPengurusData as getPengurusDataService,
-  createPengurusWithFoto as createPengurusWithFotoService,
-  updatePengurusWithOptionalFoto as updatePengurusWithOptionalFotoService,
-  deletePengurus as deletePengurusService,
-  PengurusData,
-} from "@/lib/services/supabase/pengurus";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { revalidatePath } from "next/cache";
+import type { PengurusData } from "@/lib/schema/pengurus/schema";
 
-// Server Action untuk mengambil semua data pengurus
-export async function getPengurusData() {
-  try {
-    const data = await getPengurusDataService();
-    return data;
-  } catch (error) {
-    console.error("Server Action - Error mengambil data pengurus:", error);
-    throw new Error("Gagal mengambil data pengurus");
+// Helper functions untuk server actions
+async function uploadFotoPengurus(file: File): Promise<string> {
+  const supabase = await createServerSupabaseClient();
+
+  const fileExt = file.name.split(".").pop();
+  const fileName = `${Date.now()}.${fileExt}`;
+  const filePath = `pengurus/${fileName}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from("images")
+    .upload(filePath, file, {
+      cacheControl: "3600",
+      upsert: false,
+    });
+
+  if (uploadError) {
+    throw new Error("Failed to upload photo");
+  }
+
+  const { data: publicUrlData } = supabase.storage
+    .from("images")
+    .getPublicUrl(filePath);
+
+  return publicUrlData?.publicUrl ?? "";
+}
+
+async function deleteOldFoto(fotoUrl: string) {
+  const supabase = await createServerSupabaseClient();
+
+  if (!fotoUrl) return;
+  const path = fotoUrl.split("/public/")[1];
+
+  const { error } = await supabase.storage.from("images").remove([path]);
+
+  if (error) {
+    console.error("Error deleting old photo:", error);
   }
 }
 
-// Server Action untuk membuat pengurus baru dengan foto
-export async function createPengurus(
-  pengurusData: {
-    no: number;
-    nama: string;
-    jabatan: string;
-    periode: string;
-  },
-  file?: File | null
-) {
+// SERVER ACTION - Create pengurus
+export async function createPengurusAction(formData: FormData) {
   try {
-    if (!pengurusData) {
-      throw new Error("Data pengurus tidak boleh kosong");
-    }
+    const supabase = await createServerSupabaseClient();
+    
+    const pengurusData = {
+      no: Number(formData.get("no")),
+      nama: formData.get("nama") as string,
+      jabatan: formData.get("jabatan") as string,
+      periode: formData.get("periode") as string,
+      kategori: formData.get("kategori") as string || "MASJID",
+    };
 
-    // Validasi field wajib
+    const file = formData.get("foto") as File | null;
+
+    // Validasi
     if (!pengurusData.nama || !pengurusData.jabatan || !pengurusData.periode) {
-      throw new Error("Nama, jabatan, dan periode harus diisi");
+      return { success: false, error: "Nama, jabatan, dan periode harus diisi" };
     }
 
-    if (!pengurusData.no || pengurusData.no <= 0) {
-      throw new Error("Nomor urut harus berupa angka positif");
+    // Upload foto jika ada
+    let fotoUrl = "/images/profile.png";
+    if (file && file.size > 0) {
+      fotoUrl = await uploadFotoPengurus(file);
     }
 
-    const result = await createPengurusWithFotoService(pengurusData, file || null);
-    return result;
-  } catch (error) {
-    console.error("Server Action - Error membuat pengurus:", error);
-    throw new Error("Gagal membuat pengurus baru");
-  }
-}
+    const now = new Date().toISOString();
 
-// Server Action untuk update pengurus dengan foto opsional
-export async function updatePengurus(
-  id: number,
-  updates: Partial<
-    Omit<PengurusData, "id" | "createdAt" | "updatedAt" | "fotoUrl">
-  >,
-  file?: File
-) {
-  try {
-    if (!id || id <= 0) {
-      throw new Error("ID pengurus tidak valid");
+    // Insert ke database
+    const { data: inserted, error } = await supabase
+      .from("Pengurus")
+      .insert([
+        {
+          ...pengurusData,
+          fotoUrl,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ])
+      .select();
+
+    if (error) {
+      console.error("Error creating pengurus:", error);
+      return { success: false, error: "Gagal membuat pengurus baru" };
     }
 
-    if (!updates || Object.keys(updates).length === 0) {
-      throw new Error("Data update tidak boleh kosong");
-    }
-
-    // Validasi field jika ada
-    if (updates.no !== undefined && updates.no <= 0) {
-      throw new Error("Nomor urut harus berupa angka positif");
-    }
-
-    if (updates.nama !== undefined && !updates.nama.trim()) {
-      throw new Error("Nama tidak boleh kosong");
-    }
-
-    if (updates.jabatan !== undefined && !updates.jabatan.trim()) {
-      throw new Error("Jabatan tidak boleh kosong");
-    }
-
-    if (updates.periode !== undefined && !updates.periode.trim()) {
-      throw new Error("Periode tidak boleh kosong");
-    }
-
-    const result = await updatePengurusWithOptionalFotoService(id, updates, file);
-    return result;
-  } catch (error) {
-    console.error("Server Action - Error update pengurus:", error);
-    throw new Error("Gagal mengupdate data pengurus");
-  }
-}
-
-// Server Action untuk menghapus pengurus
-export async function deletePengurus(id: number): Promise<boolean> {
-  try {
-    if (!id || id <= 0) {
-      throw new Error("ID pengurus tidak valid");
-    }
-
-    const result = await deletePengurusService(id);
-    // Pastikan return value adalah boolean
-    return Boolean(result);
-  } catch (error) {
-    console.error("Server Action - Error hapus pengurus:", error);
-    throw new Error("Gagal menghapus data pengurus");
-  }
-}
-
-// Server Action untuk mendapatkan pengurus berdasarkan ID (jika diperlukan)
-export async function getPengurusById(id: number): Promise<PengurusData | null> {
-  try {
-    if (!id || id <= 0) {
-      throw new Error("ID pengurus tidak valid");
-    }
-
-    const allPengurus = await getPengurusDataService();
-    const pengurus = allPengurus.find(p => p.id === id);
+    // Revalidate cache
+    revalidatePath("/admin/manajemen/daftar-pengurus");
     
-    return pengurus || null;
+    return { success: true, data: inserted[0] };
   } catch (error) {
-    console.error("Server Action - Error mengambil pengurus by ID:", error);
-    throw new Error("Gagal mengambil data pengurus");
+    console.error("Create pengurus action error:", error);
+    return { success: false, error: "Gagal membuat pengurus baru" };
   }
 }
 
-// Server Action untuk mendapatkan pengurus berdasarkan periode
-export async function getPengurusByPeriode(periode: string): Promise<PengurusData[]> {
+// SERVER ACTION - Update pengurus
+export async function updatePengurusAction(formData: FormData) {
   try {
-    if (!periode || !periode.trim()) {
-      throw new Error("Periode tidak boleh kosong");
+    const supabase = await createServerSupabaseClient();
+    
+    const id = Number(formData.get("id"));
+    const updates = {
+      no: Number(formData.get("no")),
+      nama: formData.get("nama") as string,
+      jabatan: formData.get("jabatan") as string,
+      periode: formData.get("periode") as string,
+      kategori: formData.get("kategori") as string || "MASJID",
+    };
+
+    const file = formData.get("foto") as File | null;
+
+    if (!id) {
+      return { success: false, error: "ID pengurus tidak valid" };
     }
 
-    const allPengurus = await getPengurusDataService();
-    const pengurusByPeriode = allPengurus.filter(p => p.periode === periode);
-    
-    return pengurusByPeriode;
-  } catch (error) {
-    console.error("Server Action - Error mengambil pengurus by periode:", error);
-    throw new Error("Gagal mengambil data pengurus berdasarkan periode");
-  }
-}
+    // Handle foto update
+    let fotoUrl: string | undefined;
+    if (file && file.size > 0) {
+      // Get old foto URL to delete
+      const { data: oldData, error: oldDataError } = await supabase
+        .from("Pengurus")
+        .select("fotoUrl")
+        .eq("id", id)
+        .single();
 
-// Server Action untuk mendapatkan daftar periode yang tersedia
-export async function getAvailablePeriode(): Promise<string[]> {
-  try {
-    const allPengurus = await getPengurusDataService();
-    const periods = [...new Set(allPengurus.map(p => p.periode))];
-    
-    return periods.sort();
-  } catch (error) {
-    console.error("Server Action - Error mengambil data periode:", error);
-    throw new Error("Gagal mengambil data periode");
-  }
-}
-
-// Server Action untuk validasi nomor urut yang unik
-export async function validateUniqueNo(no: number, excludeId?: number): Promise<boolean> {
-  try {
-    if (!no || no <= 0) {
-      throw new Error("Nomor urut tidak valid");
+      if (!oldDataError && oldData?.fotoUrl) {
+        await deleteOldFoto(oldData.fotoUrl);
+      }
+      
+      fotoUrl = await uploadFotoPengurus(file);
     }
 
-    const allPengurus = await getPengurusDataService();
-    const existingPengurus = allPengurus.find(p => 
-      p.no === no && (excludeId ? p.id !== excludeId : true)
-    );
+    // Update database
+    const { data, error } = await supabase
+      .from("Pengurus")
+      .update({
+        ...updates,
+        updatedAt: new Date().toISOString(),
+        ...(fotoUrl ? { fotoUrl } : {}),
+      })
+      .eq("id", id)
+      .select();
+
+    if (error) {
+      console.error("Error updating pengurus:", error);
+      return { success: false, error: "Gagal mengupdate pengurus" };
+    }
+
+    // Revalidate cache
+    revalidatePath("/admin/manajemen/daftar-pengurus");
     
-    return !existingPengurus; // return true jika nomor urut unik
+    return { success: true, data: data[0] };
   } catch (error) {
-    console.error("Server Action - Error validasi nomor urut:", error);
-    throw new Error("Gagal memvalidasi nomor urut");
+    console.error("Update pengurus action error:", error);
+    return { success: false, error: "Gagal mengupdate pengurus" };
+  }
+}
+
+// SERVER ACTION - Delete pengurus
+export async function deletePengurusAction(id: number) {
+  try {
+    const supabase = await createServerSupabaseClient();
+
+    if (!id) {
+      return { success: false, error: "ID pengurus tidak valid" };
+    }
+
+    // Get foto URL to delete from storage
+    const { data: pengurusData, error: fetchError } = await supabase
+      .from("Pengurus")
+      .select("fotoUrl")
+      .eq("id", id)
+      .single();
+
+    if (!fetchError && pengurusData?.fotoUrl) {
+      await deleteOldFoto(pengurusData.fotoUrl);
+    }
+
+    // Delete from database
+    const { error } = await supabase
+      .from("Pengurus")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      console.error("Error deleting pengurus:", error);
+      return { success: false, error: "Gagal menghapus pengurus" };
+    }
+
+    // Revalidate cache
+    revalidatePath("/admin/manajemen/daftar-pengurus");
+    
+    return { success: true };
+  } catch (error) {
+    console.error("Delete pengurus action error:", error);
+    return { success: false, error: "Gagal menghapus pengurus" };
   }
 }

@@ -1,32 +1,17 @@
 // src/lib/services/supabase/inventaris/inventaris.ts
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/admin";
+import { 
+  inventarisSchema, 
+  type InventarisData
+} from "@/lib/schema/inventaris/schema";
 
-export type Inventaris = {
-  id: number;
-  no: number;
-  namaBarang: string;
-  fotoUrl?: string;
-  kategori:
-    | "PERLENGKAPAN"
-    | "ELEKTRONIK"
-    | "KEBERSIHAN"
-    | "DOKUMEN"
-    | "LAINNYA";
-  jumlah: number;
-  satuan: "UNIT" | "BUAH" | "LEMBAR" | "SET" | "LAINNYA";
-  lokasi: string;
-  kondisi: "BAIK" | "CUKUP" | "RUSAK";
-  tanggalMasuk: Date;
-  tahun: number;
-  keterangan?: string;
-  createdAt: Date;
-  updatedAt: Date;
-};
+// Gunakan type dari schema
+export type Inventaris = InventarisData;
 
 export async function getInventarisData(
   tahunFilter?: number
 ): Promise<Inventaris[]> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
   let query = supabase
     .from("Inventaris")
@@ -53,7 +38,7 @@ export async function getInventarisData(
 }
 
 export async function getAvailableTahun(): Promise<number[]> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
   const { data, error } = await supabase
     .from("Inventaris")
@@ -71,7 +56,7 @@ export async function getAvailableTahun(): Promise<number[]> {
 export async function getInventarisById(
   id: number
 ): Promise<Inventaris | null> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
   const { data, error } = await supabase
     .from("Inventaris")
@@ -97,7 +82,7 @@ export async function getInventarisById(
 }
 
 export async function uploadFotoInventaris(file: File): Promise<string> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
   const fileExt = file.name.split(".").pop();
   const fileName = `${Date.now()}.${fileExt}`;
@@ -123,7 +108,7 @@ export async function createInventaris(
   inventaris: Omit<Inventaris, "id" | "tahun" | "createdAt" | "updatedAt">,
   file?: File
 ): Promise<Inventaris> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
   let fotoUrl = inventaris.fotoUrl;
   if (file) {
@@ -174,7 +159,7 @@ export async function createInventaris(
 }
 
 async function deleteOldFotoInventaris(fotoUrl: string) {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
   if (!fotoUrl) return;
 
@@ -203,7 +188,7 @@ export async function updateInventaris(
   >,
   file?: File
 ): Promise<Inventaris> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
   let fotoUrl = inventaris.fotoUrl;
   let dataToUpdate: any = { ...inventaris };
@@ -253,7 +238,7 @@ export async function updateInventaris(
 }
 
 export async function deleteInventaris(id: number): Promise<void> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseAdmin;
 
   try {
     const { data: inventarisToDelete, error: getError } = await supabase

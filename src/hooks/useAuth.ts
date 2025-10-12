@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
+import { UserRole } from '@/lib/utils/roles';
 
 interface UserProfile {
   id: string;
@@ -12,6 +13,9 @@ interface UserProfile {
   avatar_url: string;
   phone?: string;
   bio?: string;
+  role?: UserRole;
+  jabatan?: string;
+  nama?: string;
 }
 
 export const useAuth = () => {
@@ -21,34 +25,124 @@ export const useAuth = () => {
   const supabase = createClient();
 
   useEffect(() => {
-    // Get initial session
-    const getInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUser(session.user);
-        setUserProfile(mapUserToProfile(session.user));
+    let isMounted = true;
+    // Safety timer: ensure loading ends even if Supabase hangs
+    let loadingSafetyTimer: any = setTimeout(() => {
+      if (isMounted) {
+        setLoading(false);
       }
-      setLoading(false);
+    }, 5000);
+    
+    // Get initial user (more secure than getSession)
+    const getInitialUser = async () => {
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (user && !error && isMounted) {
+          setUser(user);
+          // Fetch profile in parallel to reduce loading time
+          fetchUserProfile(user).then(profile => {
+            if (isMounted) {
+              setUserProfile(profile);
+            }
+          });
+        } else if (error) {
+          console.log('Auth error in useAuth:', error.message);
+          // Don't immediately clear user state on auth errors
+          // Let the middleware handle redirects
+        }
+      } catch (error) {
+        console.error('Error getting initial user:', error);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+          clearTimeout(loadingSafetyTimer);
+        }
+      }
     };
 
-    getInitialSession();
+    getInitialUser();
 
-    // Listen for auth changes
+    // Listen for auth changes - using getUser() for security
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('Auth state change:', event, session?.user?.email);
+        
+        if (!isMounted) return;
+        
         if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-          setUser(session?.user || null);
-          setUserProfile(session?.user ? mapUserToProfile(session.user) : null);
+          // Use getUser() instead of session.user for security
+          const { data: { user }, error } = await supabase.auth.getUser();
+          if (user && !error && isMounted) {
+            setUser(user);
+            // Fetch profile asynchronously to avoid blocking
+            fetchUserProfile(user).then(profile => {
+              if (isMounted) {
+                setUserProfile(profile);
+              }
+            });
+          } else {
+            console.log('Error getting user after auth change:', error?.message);
+          }
         } else if (event === 'SIGNED_OUT') {
-          setUser(null);
-          setUserProfile(null);
+          if (isMounted) {
+            setUser(null);
+            setUserProfile(null);
+          }
         }
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+          clearTimeout(loadingSafetyTimer);
+        }
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+      clearTimeout(loadingSafetyTimer);
+    };
   }, []);
+
+  const fetchUserProfile = async (user: User): Promise<UserProfile> => {
+    const baseProfile = mapUserToProfile(user);
+    
+    try {
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Profile fetch timeout')), 5000)
+      );
+      
+      const profilePromise = supabase
+        .from('profile')
+        .select('role, jabatan, nama')
+        .eq('userId', user.id)
+        .single();
+      
+      // Race between profile fetch and timeout
+      const { data: profileData, error } = await Promise.race([
+        profilePromise,
+        timeoutPromise
+      ]) as any;
+      
+      if (error) {
+        console.warn('Profile fetch error:', error.message);
+        return baseProfile;
+      }
+      
+      if (profileData) {
+        return {
+          ...baseProfile,
+          role: profileData.role as UserRole,
+          jabatan: profileData.jabatan,
+          nama: profileData.nama,
+        };
+      }
+    } catch (error) {
+      console.warn('Error fetching user profile (using base profile):', error);
+    }
+    
+    return baseProfile;
+  };
 
   const mapUserToProfile = (user: User): UserProfile => {
     // For Google OAuth users
@@ -79,7 +173,22 @@ export const useAuth = () => {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      // Clear local state immediately for better UX
+      setUser(null);
+      setUserProfile(null);
+      
+      // Sign out from Supabase
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error('Supabase signOut error:', error);
+        // Don't throw error, just log it since we already cleared local state
+      }
+    } catch (error) {
+      console.error('Error during sign out:', error);
+      // Don't re-throw, let the component handle the redirect
+    }
   };
 
   return {
