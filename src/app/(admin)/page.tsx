@@ -233,7 +233,8 @@ export default async function DashboardAdmin() {
   const managementRoles = ['KETUA', 'SEKRETARIS', 'BENDAHARA', 'HUMAS_MEDIA', 'REMAS_ADMIN', 'MAJLIS_TALIM_ADMIN'];
   
   if (!adminRoles.includes(user.role || '') && !managementRoles.includes(user.role || '')) {
-    redirect('/signin');
+    // Redirect regular users to main dashboard instead of signin
+    redirect('/');
   }
 
   const { data: dashboardData, error } = await getDashboardData();

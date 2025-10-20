@@ -72,7 +72,7 @@ export const donaturSchema = z.object({
   id: z.number().int().positive(),
   no: z.number().int().positive(),
   nama: z.string().min(1, "Nama donatur tidak boleh kosong").trim(),
-  alamat: z.string().min(1, "Alamat tidak boleh kosong").trim(),
+  alamat: z.string().trim().transform(val => val || "Alamat tidak tersedia"),
   tahun: z.number().int().min(2000).max(new Date().getFullYear() + 1),
   jan: z.number().min(0).default(0),
   feb: z.number().min(0).default(0),

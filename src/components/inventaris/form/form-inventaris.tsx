@@ -24,6 +24,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
@@ -162,18 +169,20 @@ export function FormInventaris({
           render={({ field }) => (
             <FormItem>
               <FormLabel>Kategori</FormLabel>
-              <FormControl>
-                <select
-                  className="w-full h-10 px-3 rounded-md border border-input bg-background"
-                  {...field}
-                >
-                  <option value="PERLENGKAPAN">Perlengkapan</option>
-                  <option value="ELEKTRONIK">Elektronik</option>
-                  <option value="KEBERSIHAN">Kebersihan</option>
-                  <option value="DOKUMEN">Dokumen</option>
-                  <option value="LAINNYA">Lainnya</option>
-                </select>
-              </FormControl>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih kategori" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="PERLENGKAPAN">Perlengkapan</SelectItem>
+                  <SelectItem value="ELEKTRONIK">Elektronik</SelectItem>
+                  <SelectItem value="KEBERSIHAN">Kebersihan</SelectItem>
+                  <SelectItem value="DOKUMEN">Dokumen</SelectItem>
+                  <SelectItem value="LAINNYA">Lainnya</SelectItem>
+                </SelectContent>
+              </Select>
               <FormMessage />
             </FormItem>
           )}
@@ -208,18 +217,20 @@ export function FormInventaris({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Satuan</FormLabel>
-                <FormControl>
-                  <select
-                    className="w-full h-10 px-3 rounded-md border border-input bg-background"
-                    {...field}
-                  >
-                    <option value="UNIT">Unit</option>
-                    <option value="BUAH">Buah</option>
-                    <option value="LEMBAR">Lembar</option>
-                    <option value="SET">Set</option>
-                    <option value="LAINNYA">Lainnya</option>
-                  </select>
-                </FormControl>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih satuan" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="UNIT">Unit</SelectItem>
+                    <SelectItem value="BUAH">Buah</SelectItem>
+                    <SelectItem value="LEMBAR">Lembar</SelectItem>
+                    <SelectItem value="SET">Set</SelectItem>
+                    <SelectItem value="LAINNYA">Lainnya</SelectItem>
+                  </SelectContent>
+                </Select>
                 <FormMessage />
               </FormItem>
             )}
@@ -246,16 +257,18 @@ export function FormInventaris({
           render={({ field }) => (
             <FormItem>
               <FormLabel>Kondisi</FormLabel>
-              <FormControl>
-                <select
-                  className="w-full h-10 px-3 rounded-md border border-input bg-background"
-                  {...field}
-                >
-                  <option value="BAIK">Baik</option>
-                  <option value="CUKUP">Cukup</option>
-                  <option value="RUSAK">Rusak</option>
-                </select>
-              </FormControl>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih kondisi" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="BAIK">Baik</SelectItem>
+                  <SelectItem value="CUKUP">Cukup</SelectItem>
+                  <SelectItem value="RUSAK">Rusak</SelectItem>
+                </SelectContent>
+              </Select>
               <FormMessage />
             </FormItem>
           )}

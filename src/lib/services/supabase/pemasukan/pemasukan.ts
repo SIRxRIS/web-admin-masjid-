@@ -1,6 +1,6 @@
 // src/lib/services/supabase/pemasukan/pemasukan.ts
-import { createServerSupabaseClient } from "../../../supabase/server";
-import { 
+import { supabaseAdmin } from "../../../supabase/admin";
+import {
   type DonaturData,
   type KotakAmalData,
   type DonasiKhususData,
@@ -14,14 +14,12 @@ import {
   kotakAmalMasjidSchema,
   pemasukanSchema,
   createPemasukanSchema,
-  updatePemasukanSchema
+  updatePemasukanSchema,
 } from "../../../schema/pemasukan/schema";
 
 // ========== FUNGSI UNTUK MENGELOLA DATA DONATUR ==========
 export async function getDonaturData(tahun?: number): Promise<DonaturData[]> {
-  const supabase = await createServerSupabaseClient();
-
-  let query = supabase
+  let query = supabaseAdmin
     .from("Donatur")
     .select("*")
     .order("no", { ascending: true });
@@ -37,13 +35,11 @@ export async function getDonaturData(tahun?: number): Promise<DonaturData[]> {
     throw new Error("Gagal mengambil data donatur");
   }
 
-  return (data || []).map(item => donaturSchema.parse(item));
+  return (data || []).map((item) => donaturSchema.parse(item));
 }
 
 export async function getDonaturById(id: number): Promise<DonaturData | null> {
-  const supabase = await createServerSupabaseClient();
-
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from("Donatur")
     .select("*")
     .eq("id", id)
@@ -57,10 +53,10 @@ export async function getDonaturById(id: number): Promise<DonaturData | null> {
   return data ? donaturSchema.parse(data) : null;
 }
 
-export async function createDonatur(donatur: Omit<DonaturData, "id" | "createdAt" | "updatedAt">): Promise<DonaturData> {
-  const supabase = await createServerSupabaseClient();
-
-  const { data, error } = await supabase
+export async function createDonatur(
+  donatur: Omit<DonaturData, "id" | "createdAt" | "updatedAt">,
+): Promise<DonaturData> {
+  const { data, error } = await supabaseAdmin
     .from("Donatur")
     .insert([donatur])
     .select()
@@ -76,11 +72,9 @@ export async function createDonatur(donatur: Omit<DonaturData, "id" | "createdAt
 
 export async function updateDonatur(
   id: number,
-  donatur: Partial<Omit<DonaturData, "id" | "createdAt" | "updatedAt">>
+  donatur: Partial<Omit<DonaturData, "id" | "createdAt" | "updatedAt">>,
 ): Promise<DonaturData> {
-  const supabase = await createServerSupabaseClient();
-
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from("Donatur")
     .update(donatur)
     .eq("id", id)
@@ -96,10 +90,10 @@ export async function updateDonatur(
 }
 
 // ========== FUNGSI UNTUK MENGELOLA DATA KOTAK AMAL ==========
-export async function getKotakAmalData(tahun?: number): Promise<KotakAmalData[]> {
-  const supabase = await createServerSupabaseClient();
-
-  let query = supabase
+export async function getKotakAmalData(
+  tahun?: number,
+): Promise<KotakAmalData[]> {
+  let query = supabaseAdmin
     .from("KotakAmal")
     .select("*")
     .order("no", { ascending: true });
@@ -115,13 +109,13 @@ export async function getKotakAmalData(tahun?: number): Promise<KotakAmalData[]>
     throw new Error("Gagal mengambil data kotak amal");
   }
 
-  return (data || []).map(item => kotakAmalSchema.parse(item));
+  return (data || []).map((item) => kotakAmalSchema.parse(item));
 }
 
-export async function createKotakAmal(kotakAmal: Omit<KotakAmalData, "id" | "createdAt">): Promise<KotakAmalData> {
-  const supabase = await createServerSupabaseClient();
-
-  const { data, error } = await supabase
+export async function createKotakAmal(
+  kotakAmal: Omit<KotakAmalData, "id" | "createdAt">,
+): Promise<KotakAmalData> {
+  const { data, error } = await supabaseAdmin
     .from("KotakAmal")
     .insert([kotakAmal])
     .select()
@@ -136,10 +130,10 @@ export async function createKotakAmal(kotakAmal: Omit<KotakAmalData, "id" | "cre
 }
 
 // ========== FUNGSI UNTUK MENGELOLA DATA DONASI KHUSUS ==========
-export async function getDonasiKhususData(tahun?: number): Promise<DonasiKhususData[]> {
-  const supabase = await createServerSupabaseClient();
-
-  let query = supabase
+export async function getDonasiKhususData(
+  tahun?: number,
+): Promise<DonasiKhususData[]> {
+  let query = supabaseAdmin
     .from("DonasiKhusus")
     .select("*")
     .order("no", { ascending: true });
@@ -156,23 +150,23 @@ export async function getDonasiKhususData(tahun?: number): Promise<DonasiKhususD
   }
 
   // Tambahkan field bulan dari tanggal sebelum validasi
-  return (data || []).map(item => {
+  return (data || []).map((item) => {
     const tanggalObj = new Date(item.tanggal);
     const bulan = tanggalObj.getMonth() + 1; // +1 karena getMonth() mulai dari 0
-    
+
     const itemWithBulan = {
       ...item,
-      bulan: bulan
+      bulan: bulan,
     };
-    
+
     return donasiKhususSchema.parse(itemWithBulan);
   });
 }
 
-export async function getDonasiKhususById(id: number): Promise<DonasiKhususData | null> {
-  const supabase = await createServerSupabaseClient();
-
-  const { data, error } = await supabase
+export async function getDonasiKhususById(
+  id: number,
+): Promise<DonasiKhususData | null> {
+  const { data, error } = await supabaseAdmin
     .from("DonasiKhusus")
     .select("*")
     .eq("id", id)
@@ -188,19 +182,19 @@ export async function getDonasiKhususById(id: number): Promise<DonasiKhususData 
   // Tambahkan field bulan dari tanggal
   const tanggalObj = new Date(data.tanggal);
   const bulan = tanggalObj.getMonth() + 1;
-  
+
   const itemWithBulan = {
     ...data,
-    bulan: bulan
+    bulan: bulan,
   };
 
   return donasiKhususSchema.parse(itemWithBulan);
 }
 
-export async function createDonasiKhusus(donasiKhusus: Omit<DonasiKhususData, "id" | "createdAt" | "bulan">): Promise<DonasiKhususData> {
-  const supabase = await createServerSupabaseClient();
-
-  const { data, error } = await supabase
+export async function createDonasiKhusus(
+  donasiKhusus: Omit<DonasiKhususData, "id" | "createdAt" | "bulan">,
+): Promise<DonasiKhususData> {
+  const { data, error } = await supabaseAdmin
     .from("DonasiKhusus")
     .insert([donasiKhusus])
     .select()
@@ -214,20 +208,20 @@ export async function createDonasiKhusus(donasiKhusus: Omit<DonasiKhususData, "i
   // Tambahkan field bulan dari tanggal
   const tanggalObj = new Date(data.tanggal);
   const bulan = tanggalObj.getMonth() + 1;
-  
+
   const itemWithBulan = {
     ...data,
-    bulan: bulan
+    bulan: bulan,
   };
 
   return donasiKhususSchema.parse(itemWithBulan);
 }
 
 // ========== FUNGSI UNTUK MENGELOLA DATA KOTAK AMAL MASJID ==========
-export async function getKotakAmalMasjidData(tahun?: number): Promise<KotakAmalMasjidData[]> {
-  const supabase = await createServerSupabaseClient();
-
-  let query = supabase
+export async function getKotakAmalMasjidData(
+  tahun?: number,
+): Promise<KotakAmalMasjidData[]> {
+  let query = supabaseAdmin
     .from("KotakAmalMasjid")
     .select("*")
     .order("tanggal", { ascending: false });
@@ -243,13 +237,13 @@ export async function getKotakAmalMasjidData(tahun?: number): Promise<KotakAmalM
     throw new Error("Gagal mengambil data kotak amal masjid");
   }
 
-  return (data || []).map(item => kotakAmalMasjidSchema.parse(item));
+  return (data || []).map((item) => kotakAmalMasjidSchema.parse(item));
 }
 
-export async function createKotakAmalMasjid(kotakAmalMasjid: Omit<KotakAmalMasjidData, "id" | "createdAt">): Promise<KotakAmalMasjidData> {
-  const supabase = await createServerSupabaseClient();
-
-  const { data, error } = await supabase
+export async function createKotakAmalMasjid(
+  kotakAmalMasjid: Omit<KotakAmalMasjidData, "id" | "createdAt">,
+): Promise<KotakAmalMasjidData> {
+  const { data, error } = await supabaseAdmin
     .from("KotakAmalMasjid")
     .insert([kotakAmalMasjid])
     .select()
@@ -264,92 +258,124 @@ export async function createKotakAmalMasjid(kotakAmalMasjid: Omit<KotakAmalMasji
 }
 
 // ========== FUNGSI STATISTIK DAN ANALISIS ==========
-export async function getTotalPemasukanBySumber(tahun: number): Promise<Record<string, number>> {
-  const supabase = await createServerSupabaseClient();
-
+export async function getTotalPemasukanBySumber(
+  tahun: number,
+): Promise<Record<string, number>> {
   try {
     const result: Record<string, number> = {};
 
     // 1. Total dari Donatur
-    const { data: donaturData } = await supabase
+    const { data: donaturData } = await supabaseAdmin
       .from("Donatur")
       .select("jan, feb, mar, apr, mei, jun, jul, aug, sep, okt, nov, des")
       .eq("tahun", tahun);
 
     if (donaturData) {
       const totalDonatur = donaturData.reduce((sum, item) => {
-        return sum + (item.jan || 0) + (item.feb || 0) + (item.mar || 0) + (item.apr || 0) +
-               (item.mei || 0) + (item.jun || 0) + (item.jul || 0) + (item.aug || 0) +
-               (item.sep || 0) + (item.okt || 0) + (item.nov || 0) + (item.des || 0);
+        return (
+          sum +
+          (item.jan || 0) +
+          (item.feb || 0) +
+          (item.mar || 0) +
+          (item.apr || 0) +
+          (item.mei || 0) +
+          (item.jun || 0) +
+          (item.jul || 0) +
+          (item.aug || 0) +
+          (item.sep || 0) +
+          (item.okt || 0) +
+          (item.nov || 0) +
+          (item.des || 0)
+        );
       }, 0);
-      
+
       if (totalDonatur > 0) {
         result["DONATUR"] = totalDonatur;
       }
     }
 
     // 2. Total dari KotakAmal (KOTAK_AMAL_LUAR)
-    const { data: kotakAmalData } = await supabase
+    const { data: kotakAmalData } = await supabaseAdmin
       .from("KotakAmal")
       .select("jan, feb, mar, apr, mei, jun, jul, aug, sep, okt, nov, des")
       .eq("tahun", tahun);
 
     if (kotakAmalData) {
       const totalKotakAmal = kotakAmalData.reduce((sum, item) => {
-        return sum + (item.jan || 0) + (item.feb || 0) + (item.mar || 0) + (item.apr || 0) +
-               (item.mei || 0) + (item.jun || 0) + (item.jul || 0) + (item.aug || 0) +
-               (item.sep || 0) + (item.okt || 0) + (item.nov || 0) + (item.des || 0);
+        return (
+          sum +
+          (item.jan || 0) +
+          (item.feb || 0) +
+          (item.mar || 0) +
+          (item.apr || 0) +
+          (item.mei || 0) +
+          (item.jun || 0) +
+          (item.jul || 0) +
+          (item.aug || 0) +
+          (item.sep || 0) +
+          (item.okt || 0) +
+          (item.nov || 0) +
+          (item.des || 0)
+        );
       }, 0);
-      
+
       if (totalKotakAmal > 0) {
         result["KOTAK_AMAL_LUAR"] = totalKotakAmal;
       }
     }
 
     // 3. Total dari KotakAmalMasjid
-    const { data: kotakMasjidData } = await supabase
+    const { data: kotakMasjidData } = await supabaseAdmin
       .from("KotakAmalMasjid")
       .select("jumlah")
       .eq("tahun", tahun);
 
     if (kotakMasjidData) {
-      const totalKotakMasjid = kotakMasjidData.reduce((sum, item) => sum + (item.jumlah || 0), 0);
-      
+      const totalKotakMasjid = kotakMasjidData.reduce(
+        (sum, item) => sum + (item.jumlah || 0),
+        0,
+      );
+
       if (totalKotakMasjid > 0) {
         result["KOTAK_AMAL_MASJID"] = totalKotakMasjid;
       }
     }
 
     // 4. Total dari KotakAmalJumat
-    const { data: kotakJumatData } = await supabase
+    const { data: kotakJumatData } = await supabaseAdmin
       .from("KotakAmalJumat")
       .select("jumlah")
       .eq("tahun", tahun);
 
     if (kotakJumatData) {
-      const totalKotakJumat = kotakJumatData.reduce((sum, item) => sum + (item.jumlah || 0), 0);
-      
+      const totalKotakJumat = kotakJumatData.reduce(
+        (sum, item) => sum + (item.jumlah || 0),
+        0,
+      );
+
       if (totalKotakJumat > 0) {
         result["KOTAK_AMAL_JUMAT"] = totalKotakJumat;
       }
     }
 
     // 5. Total dari DonasiKhusus
-    const { data: donasiKhususData } = await supabase
+    const { data: donasiKhususData } = await supabaseAdmin
       .from("DonasiKhusus")
       .select("jumlah")
       .eq("tahun", tahun);
 
     if (donasiKhususData) {
-      const totalDonasiKhusus = donasiKhususData.reduce((sum, item) => sum + (item.jumlah || 0), 0);
-      
+      const totalDonasiKhusus = donasiKhususData.reduce(
+        (sum, item) => sum + (item.jumlah || 0),
+        0,
+      );
+
       if (totalDonasiKhusus > 0) {
         result["DONASI_KHUSUS"] = totalDonasiKhusus;
       }
     }
 
     return result;
-
   } catch (error: any) {
     console.error("Error mengambil total pemasukan berdasarkan sumber:", error);
     throw new Error("Gagal mengambil total pemasukan berdasarkan sumber");
@@ -358,29 +384,32 @@ export async function getTotalPemasukanBySumber(tahun: number): Promise<Record<s
 
 // Fungsi untuk mendapatkan tahun yang tersedia dari semua tabel sumber
 export async function getAvailableTahunPemasukan(): Promise<number[]> {
-  const supabase = await createServerSupabaseClient();
-
   try {
     const tahunSet = new Set<number>();
 
     // Ambil tahun dari semua tabel sumber
-    const [donaturData, kotakAmalData, kotakMasjidData, kotakJumatData, donasiKhususData] = await Promise.all([
-      supabase.from("Donatur").select("tahun"),
-      supabase.from("KotakAmal").select("tahun"),
-      supabase.from("KotakAmalMasjid").select("tahun"),
-      supabase.from("KotakAmalJumat").select("tahun"),
-      supabase.from("DonasiKhusus").select("tahun")
+    const [
+      donaturData,
+      kotakAmalData,
+      kotakMasjidData,
+      kotakJumatData,
+      donasiKhususData,
+    ] = await Promise.all([
+      supabaseAdmin.from("Donatur").select("tahun"),
+      supabaseAdmin.from("KotakAmal").select("tahun"),
+      supabaseAdmin.from("KotakAmalMasjid").select("tahun"),
+      supabaseAdmin.from("KotakAmalJumat").select("tahun"),
+      supabaseAdmin.from("DonasiKhusus").select("tahun"),
     ]);
 
     // Kumpulkan semua tahun
-    donaturData.data?.forEach(item => tahunSet.add(item.tahun));
-    kotakAmalData.data?.forEach(item => tahunSet.add(item.tahun));
-    kotakMasjidData.data?.forEach(item => tahunSet.add(item.tahun));
-    kotakJumatData.data?.forEach(item => tahunSet.add(item.tahun));
-    donasiKhususData.data?.forEach(item => tahunSet.add(item.tahun));
+    donaturData.data?.forEach((item) => tahunSet.add(item.tahun));
+    kotakAmalData.data?.forEach((item) => tahunSet.add(item.tahun));
+    kotakMasjidData.data?.forEach((item) => tahunSet.add(item.tahun));
+    kotakJumatData.data?.forEach((item) => tahunSet.add(item.tahun));
+    donasiKhususData.data?.forEach((item) => tahunSet.add(item.tahun));
 
     return Array.from(tahunSet).sort((a, b) => b - a); // Sort descending
-
   } catch (error: any) {
     console.error("Error mengambil data tahun pemasukan:", error);
     throw new Error("Gagal mengambil data tahun pemasukan");
@@ -391,46 +420,71 @@ export async function getAvailableTahunPemasukan(): Promise<number[]> {
 export async function getStatistikPemasukan(tahun: number) {
   try {
     const [totalBySumber] = await Promise.all([
-      getTotalPemasukanBySumber(tahun)
+      getTotalPemasukanBySumber(tahun),
     ]);
 
-    const totalTahunan = Object.values(totalBySumber).reduce((sum, amount) => sum + amount, 0);
+    const totalTahunan = Object.values(totalBySumber).reduce(
+      (sum, amount) => sum + amount,
+      0,
+    );
 
     // Hitung data bulanan dari semua sumber
     const dataBulanan = [];
     for (let bulan = 1; bulan <= 12; bulan++) {
-      const supabase = await createServerSupabaseClient();
-      
       let totalBulan = 0;
 
       // Dari Donatur
-      const { data: donaturData } = await supabase
+      const { data: donaturData } = await supabaseAdmin
         .from("Donatur")
         .select("jan, feb, mar, apr, mei, jun, jul, aug, sep, okt, nov, des")
         .eq("tahun", tahun);
 
       if (donaturData) {
-        const monthNames = ['jan', 'feb', 'mar', 'apr', 'mei', 'jun', 
-                           'jul', 'aug', 'sep', 'okt', 'nov', 'des'] as const;
+        const monthNames = [
+          "jan",
+          "feb",
+          "mar",
+          "apr",
+          "mei",
+          "jun",
+          "jul",
+          "aug",
+          "sep",
+          "okt",
+          "nov",
+          "des",
+        ] as const;
         const monthKey = monthNames[bulan - 1];
-        
-        donaturData.forEach(donatur => {
+
+        donaturData.forEach((donatur) => {
           totalBulan += donatur[monthKey] || 0;
         });
       }
 
       // Dari KotakAmal
-      const { data: kotakAmalData } = await supabase
+      const { data: kotakAmalData } = await supabaseAdmin
         .from("KotakAmal")
         .select("jan, feb, mar, apr, mei, jun, jul, aug, sep, okt, nov, des")
         .eq("tahun", tahun);
 
       if (kotakAmalData) {
-        const monthNames = ['jan', 'feb', 'mar', 'apr', 'mei', 'jun', 
-                           'jul', 'aug', 'sep', 'okt', 'nov', 'des'] as const;
+        const monthNames = [
+          "jan",
+          "feb",
+          "mar",
+          "apr",
+          "mei",
+          "jun",
+          "jul",
+          "aug",
+          "sep",
+          "okt",
+          "nov",
+          "des",
+        ] as const;
         const monthKey = monthNames[bulan - 1];
-        
-        kotakAmalData.forEach(kotak => {
+
+        kotakAmalData.forEach((kotak) => {
           totalBulan += kotak[monthKey] || 0;
         });
       }
@@ -438,55 +492,58 @@ export async function getStatistikPemasukan(tahun: number) {
       // Dari KotakAmalMasjid, KotakAmalJumat dan DonasiKhusus (berdasarkan tanggal)
       const startDate = new Date(tahun, bulan - 1, 1);
       const endDate = new Date(tahun, bulan, 0);
-      
-      const [kotakMasjidData, kotakJumatData, donasiKhususData] = await Promise.all([
-        supabase.from("KotakAmalMasjid")
-          .select("jumlah")
-          .eq("tahun", tahun)
-          .gte("tanggal", startDate.toISOString().split("T")[0])
-          .lte("tanggal", endDate.toISOString().split("T")[0]),
-        supabase.from("KotakAmalJumat")
-          .select("jumlah")
-          .eq("tahun", tahun)
-          .gte("tanggal", startDate.toISOString().split("T")[0])
-          .lte("tanggal", endDate.toISOString().split("T")[0]),
-        supabase.from("DonasiKhusus")
-          .select("jumlah")
-          .eq("tahun", tahun)
-          .gte("tanggal", startDate.toISOString().split("T")[0])
-          .lte("tanggal", endDate.toISOString().split("T")[0])
-      ]);
+
+      const [kotakMasjidData, kotakJumatData, donasiKhususData] =
+        await Promise.all([
+          supabaseAdmin
+            .from("KotakAmalMasjid")
+            .select("jumlah")
+            .eq("tahun", tahun)
+            .gte("tanggal", startDate.toISOString().split("T")[0])
+            .lte("tanggal", endDate.toISOString().split("T")[0]),
+          supabaseAdmin
+            .from("KotakAmalJumat")
+            .select("jumlah")
+            .eq("tahun", tahun)
+            .gte("tanggal", startDate.toISOString().split("T")[0])
+            .lte("tanggal", endDate.toISOString().split("T")[0]),
+          supabaseAdmin
+            .from("DonasiKhusus")
+            .select("jumlah")
+            .eq("tahun", tahun)
+            .gte("tanggal", startDate.toISOString().split("T")[0])
+            .lte("tanggal", endDate.toISOString().split("T")[0]),
+        ]);
 
       if (kotakMasjidData.data) {
-        kotakMasjidData.data.forEach(item => {
+        kotakMasjidData.data.forEach((item) => {
           totalBulan += item.jumlah || 0;
         });
       }
 
       if (kotakJumatData.data) {
-        kotakJumatData.data.forEach(item => {
+        kotakJumatData.data.forEach((item) => {
           totalBulan += item.jumlah || 0;
         });
       }
 
       if (donasiKhususData.data) {
-        donasiKhususData.data.forEach(item => {
+        donasiKhususData.data.forEach((item) => {
           totalBulan += item.jumlah || 0;
         });
       }
 
       dataBulanan.push({
         bulan: bulan,
-        jumlah: totalBulan
+        jumlah: totalBulan,
       });
     }
 
     return {
       totalTahunan,
       totalBySumber,
-      dataBulanan
+      dataBulanan,
     };
-
   } catch (error: any) {
     console.error("Error mengambil statistik pemasukan:", error);
     throw new Error("Gagal mengambil statistik pemasukan");
@@ -501,18 +558,19 @@ export async function getPemasukanData(filter?: { tahun?: number }): Promise<{
   kotakAmalMasjid: KotakAmalMasjidData[];
 }> {
   try {
-    const [donatur, kotakAmal, donasiKhusus, kotakAmalMasjid] = await Promise.all([
-      getDonaturData(filter?.tahun),
-      getKotakAmalData(filter?.tahun),
-      getDonasiKhususData(filter?.tahun),
-      getKotakAmalMasjidData(filter?.tahun)
-    ]);
+    const [donatur, kotakAmal, donasiKhusus, kotakAmalMasjid] =
+      await Promise.all([
+        getDonaturData(filter?.tahun),
+        getKotakAmalData(filter?.tahun),
+        getDonasiKhususData(filter?.tahun),
+        getKotakAmalMasjidData(filter?.tahun),
+      ]);
 
     return {
       donatur,
       kotakAmal,
       donasiKhusus,
-      kotakAmalMasjid
+      kotakAmalMasjid,
     };
   } catch (error) {
     console.error("Error mengambil data pemasukan:", error);
@@ -522,30 +580,28 @@ export async function getPemasukanData(filter?: { tahun?: number }): Promise<{
 
 export async function getPemasukanByDateRange(
   tanggalMulai: Date,
-  tanggalSelesai: Date
+  tanggalSelesai: Date,
 ): Promise<{
   donasiKhusus: DonasiKhususData[];
   kotakAmalMasjid: KotakAmalMasjidData[];
 }> {
-  const supabase = await createServerSupabaseClient();
-
   try {
     const startDate = tanggalMulai.toISOString().split("T")[0];
     const endDate = tanggalSelesai.toISOString().split("T")[0];
 
     const [donasiKhususResult, kotakAmalMasjidResult] = await Promise.all([
-      supabase
+      supabaseAdmin
         .from("DonasiKhusus")
         .select("*")
         .gte("tanggal", startDate)
         .lte("tanggal", endDate)
         .order("tanggal", { ascending: false }),
-      supabase
+      supabaseAdmin
         .from("KotakAmalMasjid")
         .select("*")
         .gte("tanggal", startDate)
         .lte("tanggal", endDate)
-        .order("tanggal", { ascending: false })
+        .order("tanggal", { ascending: false }),
     ]);
 
     if (donasiKhususResult.error) {
@@ -554,23 +610,26 @@ export async function getPemasukanByDateRange(
     }
 
     if (kotakAmalMasjidResult.error) {
-      console.error("Error mengambil kotak amal masjid:", kotakAmalMasjidResult.error);
+      console.error(
+        "Error mengambil kotak amal masjid:",
+        kotakAmalMasjidResult.error,
+      );
       throw new Error("Gagal mengambil data kotak amal masjid");
     }
 
-    const donasiKhusus = (donasiKhususResult.data || []).map(item => {
+    const donasiKhusus = (donasiKhususResult.data || []).map((item) => {
       const tanggalObj = new Date(item.tanggal);
       const bulan = tanggalObj.getMonth() + 1;
       return donasiKhususSchema.parse({ ...item, bulan });
     });
 
-    const kotakAmalMasjid = (kotakAmalMasjidResult.data || []).map(item => 
-      kotakAmalMasjidSchema.parse(item)
+    const kotakAmalMasjid = (kotakAmalMasjidResult.data || []).map((item) =>
+      kotakAmalMasjidSchema.parse(item),
     );
 
     return {
       donasiKhusus,
-      kotakAmalMasjid
+      kotakAmalMasjid,
     };
   } catch (error) {
     console.error("Error mengambil data pemasukan by date range:", error);
@@ -580,13 +639,13 @@ export async function getPemasukanByDateRange(
 
 // ========== FUNGSI UNTUK MENGELOLA DATA PEMASUKAN ==========
 
-export async function createPemasukan(pemasukanData: CreatePemasukanInput): Promise<PemasukanData> {
-  const supabase = await createServerSupabaseClient();
-
+export async function createPemasukan(
+  pemasukanData: CreatePemasukanInput,
+): Promise<PemasukanData> {
   // Validasi input dengan schema
   const validatedData = createPemasukanSchema.parse(pemasukanData);
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from("Pemasukan")
     .insert([validatedData])
     .select()
@@ -600,10 +659,10 @@ export async function createPemasukan(pemasukanData: CreatePemasukanInput): Prom
   return pemasukanSchema.parse(data);
 }
 
-export async function getPemasukanById(id: number): Promise<PemasukanData | null> {
-  const supabase = await createServerSupabaseClient();
-
-  const { data, error } = await supabase
+export async function getPemasukanById(
+  id: number,
+): Promise<PemasukanData | null> {
+  const { data, error } = await supabaseAdmin
     .from("Pemasukan")
     .select("*")
     .eq("id", id)
@@ -617,13 +676,14 @@ export async function getPemasukanById(id: number): Promise<PemasukanData | null
   return pemasukanSchema.parse(data);
 }
 
-export async function updatePemasukan(id: number, pemasukanData: Partial<Omit<CreatePemasukanInput, 'id'>>): Promise<PemasukanData> {
-  const supabase = await createServerSupabaseClient();
-
+export async function updatePemasukan(
+  id: number,
+  pemasukanData: Partial<Omit<CreatePemasukanInput, "id">>,
+): Promise<PemasukanData> {
   // Validasi input dengan schema partial
   const validatedData = createPemasukanSchema.partial().parse(pemasukanData);
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from("Pemasukan")
     .update(validatedData)
     .eq("id", id)
@@ -638,13 +698,10 @@ export async function updatePemasukan(id: number, pemasukanData: Partial<Omit<Cr
   return pemasukanSchema.parse(data);
 }
 
-export async function deletePemasukan(id: number): Promise<{ success: boolean; error?: string }> {
-  const supabase = await createServerSupabaseClient();
-
-  const { error } = await supabase
-    .from("Pemasukan")
-    .delete()
-    .eq("id", id);
+export async function deletePemasukan(
+  id: number,
+): Promise<{ success: boolean; error?: string }> {
+  const { error } = await supabaseAdmin.from("Pemasukan").delete().eq("id", id);
 
   if (error) {
     console.error("Error menghapus pemasukan:", error);
@@ -653,4 +710,3 @@ export async function deletePemasukan(id: number): Promise<{ success: boolean; e
 
   return { success: true };
 }
-

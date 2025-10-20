@@ -16,6 +16,27 @@ export default function UserDropdown() {
   const { user, userProfile, loading, signOut } = useAuth();
   const router = useRouter();
 
+  // Debug logging
+  useEffect(() => {
+    console.log('UserDropdown render:', { 
+      loading, 
+      hasUser: !!user, 
+      hasProfile: !!userProfile,
+      userId: user?.id 
+    });
+  }, [loading, user, userProfile]);
+
+  // Fallback untuk loading yang terlalu lama
+  useEffect(() => {
+    if (loading) {
+      const timeoutId = setTimeout(() => {
+        console.warn('UserDropdown: Loading timeout reached, this might indicate an issue with useAuth');
+      }, 15000); // 15 detik warning
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [loading]);
+
   function toggleDropdown(e: React.MouseEvent<HTMLButtonElement, MouseEvent>) {
     e.stopPropagation();
     setIsOpen((prev) => !prev);
@@ -32,36 +53,42 @@ export default function UserDropdown() {
     closeDropdown();
     
     try {
+      // Show overlay immediately for better UX
+      setShowExitOverlay(true);
+      
       // Sign out from Supabase
       await signOut();
-      // Tampilkan overlay fade-out singkat sebelum full reload
-      setShowExitOverlay(true);
-      const delay = 400; // 300-500ms untuk transisi halus
-      setTimeout(() => {
-        // Paksa reload penuh agar cookies Supabase dibersihkan dan middleware menangkap state baru
-        if (typeof window !== 'undefined') {
-          window.location.replace('/signin?signedOut=true');
-        } else {
-          router.replace('/signin?signedOut=true');
-        }
-      }, delay);
+      
+      // Wait a bit for the signOut to complete
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Force full page reload to ensure complete session cleanup
+      if (typeof window !== 'undefined') {
+        // Clear any remaining client-side state
+        window.localStorage.clear();
+        window.sessionStorage.clear();
+        
+        // Use location.href for a complete page reload
+        window.location.href = '/signin?signedOut=true';
+      } else {
+        router.replace('/signin?signedOut=true');
+      }
       
     } catch (error) {
       console.error('Error signing out:', error);
-      // Tampilkan overlay juga pada error untuk UX yang konsisten
-      setShowExitOverlay(true);
-      const delay = 400;
-      setTimeout(() => {
-        // Even if signOut fails, force full navigation to signin
-        if (typeof window !== 'undefined') {
-          window.location.replace('/signin?signedOut=true');
-        } else {
-          router.replace('/signin?signedOut=true');
-        }
-      }, delay);
+      
+      // Even if signOut fails, force full navigation to signin
+      if (typeof window !== 'undefined') {
+        window.location.href = '/signin?signedOut=true';
+      } else {
+        router.replace('/signin?signedOut=true');
+      }
     } finally {
       // Reset state after a delay to prevent UI flicker
-      setTimeout(() => setIsSigningOut(false), 1000);
+      setTimeout(() => {
+        setIsSigningOut(false);
+        setShowExitOverlay(false);
+      }, 1000);
     }
   };
 
@@ -180,7 +207,9 @@ export default function UserDropdown() {
               onItemClick={closeDropdown}
               tag="a"
               href="/profile"
-              className="flex items-center gap-3 px-3 py-2 font-medium text-gray-700 rounded-lg group text-theme-sm hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
+              className={`flex items-center gap-3 px-3 py-2 font-medium text-gray-700 rounded-lg group text-theme-sm hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300 ${
+                loading ? "pointer-events-none opacity-50" : ""
+              }`}
             >
               <svg
                 className="fill-gray-500 group-hover:fill-gray-700 dark:fill-gray-400 dark:group-hover:fill-gray-300"

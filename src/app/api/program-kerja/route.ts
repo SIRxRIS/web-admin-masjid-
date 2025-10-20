@@ -1,25 +1,27 @@
+// File: src/app/api/program-kerja/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
-import { getVisiMisiData, createVisiMisi, CreateVisiMisiData } from '@/lib/services/supabase/visi-misi';
+import { getProgramKerjaData, createProgramKerja, CreateProgramKerjaData } from '@/lib/services/supabase/program-kerja';
 import { z } from 'zod';
 
 // Schema untuk validasi input
-const visiMisiSchema = z.object({
-  kategori: z.enum(['MASJID', 'REMAS', 'MAJLIS_TALIM']),
-  jenis: z.enum(['VISI', 'MISI']),
-  konten: z.string().min(10).max(1000),
-  divisi: z.string().optional().nullable(),
+const programKerjaSchema = z.object({
+  kategori: z.enum(['PENGURUS_MASJID', 'REMAS', 'MAJLIS_TALIM']),
+  seksi: z.string().min(2).max(100),
+  programKerja: z.string().min(10).max(1000),
   urutan: z.number().min(1).max(100),
+  tahun: z.number().optional().nullable(),
   isActive: z.boolean(),
 });
 
-// GET - Ambil semua visi misi atau filter berdasarkan kategori
+// GET - Ambil semua program kerja atau filter berdasarkan kategori/seksi
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const kategori = searchParams.get('kategori') || undefined;
-    const jenis = searchParams.get('jenis') || undefined;
+    const seksi = searchParams.get('seksi') || undefined;
 
-    const { data, error } = await getVisiMisiData(kategori, jenis);
+    const { data, error } = await getProgramKerjaData(kategori, seksi);
 
     if (error) {
       return NextResponse.json(
@@ -36,26 +38,26 @@ export async function GET(request: NextRequest) {
       data: data || [],
     });
   } catch (error) {
-    console.error('Error fetching visi misi:', error);
+    console.error('Error fetching program kerja:', error);
     return NextResponse.json(
       {
         success: false,
-        message: 'Gagal mengambil data visi misi',
+        message: 'Gagal mengambil data program kerja',
       },
       { status: 500 }
     );
   }
 }
 
-// POST - Tambah visi misi baru
+// POST - Tambah program kerja baru
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
     // Validasi input
-    const validatedData = visiMisiSchema.parse(body);
+    const validatedData = programKerjaSchema.parse(body);
 
-    const { data, error } = await createVisiMisi(validatedData as CreateVisiMisiData);
+    const { data, error } = await createProgramKerja(validatedData as CreateProgramKerjaData);
 
     if (error) {
       return NextResponse.json(
@@ -69,7 +71,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Visi misi berhasil ditambahkan',
+      message: 'Program kerja berhasil ditambahkan',
       data,
     });
   } catch (error) {
@@ -84,11 +86,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.error('Error creating visi misi:', error);
+    console.error('Error creating program kerja:', error);
     return NextResponse.json(
       {
         success: false,
-        message: 'Gagal menambahkan visi misi',
+        message: 'Gagal menambahkan program kerja',
       },
       { status: 500 }
     );

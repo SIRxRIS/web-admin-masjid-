@@ -375,30 +375,26 @@ model TargetPemasukan {
   @@map("target_pemasukan")
 }
 
-enum KategoriVisiMisi {
-  MASJID
+enum KategoriOrganisasi {
+  PENGURUS_MASJID
   REMAS
   MAJLIS_TALIM
 }
 
-enum JenisVisiMisi {
-  VISI
-  MISI
-}
+model programkerja {
+  id            Int                 @id @default(autoincrement())
+  kategori      KategoriOrganisasi  // Pengurus Masjid, Remas, atau Majlis Ta'lim
+  seksi         String              // Contoh: "Ibadah", "Humas", "Media dan Informasi", dll
+  programKerja  String              @db.Text // Deskripsi program kerja langsung (contoh: "Memberdayakan dan membantu...")
+  urutan        Int                 @default(1) // Urutan poin (1, 2, 3, dst)
+  tahun         Int?                // Tahun program kerja (opsional)
+  isActive      Boolean             @default(true)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
 
-model VisiMisi {
-  id        Int              @id @default(autoincrement())
-  kategori  KategoriVisiMisi
-  jenis     JenisVisiMisi
-  konten    String           @db.Text
-  divisi    String?          // Divisi/Seksi - nullable untuk backward compatibility
-  urutan    Int              @default(1)
-  isActive  Boolean          @default(true)
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
-
-  @@unique([kategori, jenis, divisi, urutan])
-  @@map("visi_misi")
+  // Constraint untuk memastikan tidak ada duplikasi urutan dalam kategori dan seksi yang sama
+  @@unique([kategori, seksi, urutan, tahun])
+  @@index([kategori, seksi])
 }
 
 model SiteConfiguration {

@@ -39,7 +39,7 @@ const navItems: NavItem[] = [
   {
     icon: <GridIcon />,
     name: "Dashboard",
-    path: "/", 
+    path: "/",
   },
   {
     name: "Keuangan",
@@ -56,7 +56,7 @@ const navItems: NavItem[] = [
     path: "/manajemen",
     subItems: [
       { name: "Daftar Pengurus", path: "/daftar-pengurus", pro: false },
-      { name: "Visi & Misi", path: "/visi-misi", pro: false },
+      { name: "Program Kerja", path: "/program-kerja", pro: false },
     ],
   },
   {
@@ -186,7 +186,7 @@ const AppSidebar: React.FC = () => {
         },
       ];
     }
-    
+
     // For non-admin users, show regular menus without admin section
     return [...navItems];
   };

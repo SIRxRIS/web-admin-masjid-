@@ -16,6 +16,7 @@ interface UserProfile {
   role?: UserRole;
   jabatan?: string;
   nama?: string;
+  alamat?: string;
 }
 
 export const useAuth = () => {
@@ -24,105 +25,15 @@ export const useAuth = () => {
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
-  useEffect(() => {
-    let isMounted = true;
-    // Safety timer: ensure loading ends even if Supabase hangs
-    let loadingSafetyTimer: any = setTimeout(() => {
-      if (isMounted) {
-        setLoading(false);
-      }
-    }, 5000);
-    
-    // Get initial user (more secure than getSession)
-    const getInitialUser = async () => {
-      try {
-        const { data: { user }, error } = await supabase.auth.getUser();
-        if (user && !error && isMounted) {
-          setUser(user);
-          // Fetch profile in parallel to reduce loading time
-          fetchUserProfile(user).then(profile => {
-            if (isMounted) {
-              setUserProfile(profile);
-            }
-          });
-        } else if (error) {
-          console.log('Auth error in useAuth:', error.message);
-          // Don't immediately clear user state on auth errors
-          // Let the middleware handle redirects
-        }
-      } catch (error) {
-        console.error('Error getting initial user:', error);
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-          clearTimeout(loadingSafetyTimer);
-        }
-      }
-    };
-
-    getInitialUser();
-
-    // Listen for auth changes - using getUser() for security
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth state change:', event, session?.user?.email);
-        
-        if (!isMounted) return;
-        
-        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-          // Use getUser() instead of session.user for security
-          const { data: { user }, error } = await supabase.auth.getUser();
-          if (user && !error && isMounted) {
-            setUser(user);
-            // Fetch profile asynchronously to avoid blocking
-            fetchUserProfile(user).then(profile => {
-              if (isMounted) {
-                setUserProfile(profile);
-              }
-            });
-          } else {
-            console.log('Error getting user after auth change:', error?.message);
-          }
-        } else if (event === 'SIGNED_OUT') {
-          if (isMounted) {
-            setUser(null);
-            setUserProfile(null);
-          }
-        }
-        if (isMounted) {
-          setLoading(false);
-          clearTimeout(loadingSafetyTimer);
-        }
-      }
-    );
-
-    return () => {
-      isMounted = false;
-      subscription.unsubscribe();
-      clearTimeout(loadingSafetyTimer);
-    };
-  }, []);
-
-  const fetchUserProfile = async (user: User): Promise<UserProfile> => {
-    const baseProfile = mapUserToProfile(user);
-    
+  const fetchUserProfile = async (user: User): Promise<UserProfile | null> => {
     try {
-      // Add timeout to prevent hanging
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Profile fetch timeout')), 5000)
-      );
+      const baseProfile = mapUserToProfile(user);
       
-      const profilePromise = supabase
+      const { data: profileData, error } = await supabase
         .from('profile')
-        .select('role, jabatan, nama')
+        .select('role, jabatan, nama, alamat, phone')
         .eq('userId', user.id)
         .single();
-      
-      // Race between profile fetch and timeout
-      const { data: profileData, error } = await Promise.race([
-        profilePromise,
-        timeoutPromise
-      ]) as any;
       
       if (error) {
         console.warn('Profile fetch error:', error.message);
@@ -135,14 +46,150 @@ export const useAuth = () => {
           role: profileData.role as UserRole,
           jabatan: profileData.jabatan,
           nama: profileData.nama,
+          alamat: profileData.alamat,
+          phone: profileData.phone,
         };
       }
+      
+      return baseProfile;
     } catch (error) {
       console.warn('Error fetching user profile (using base profile):', error);
+      return mapUserToProfile(user);
     }
-    
-    return baseProfile;
   };
+
+  const refreshUserProfile = async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      const profile = await fetchUserProfile(user);
+      setUserProfile(profile);
+    } catch (error) {
+      console.error("Failed to refresh user profile:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+    let timeoutId: NodeJS.Timeout;
+    
+    // Timeout untuk mencegah loading terlalu lama
+    const setLoadingTimeout = () => {
+      timeoutId = setTimeout(() => {
+        if (isMounted) {
+          console.warn('Auth loading timeout - forcing loading to false');
+          setLoading(false);
+        }
+      }, 10000); // 10 detik timeout
+    };
+    
+    const clearLoadingTimeout = () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+    
+    const getInitialUser = async () => {
+      setLoadingTimeout();
+      
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        
+        if (!isMounted) return;
+        
+        if (user && !error) {
+          setUser(user);
+          try {
+            const profile = await fetchUserProfile(user);
+            if (isMounted) {
+              setUserProfile(profile);
+            }
+          } catch (profileError) {
+            console.error('Error fetching user profile:', profileError);
+            if (isMounted) {
+              setUserProfile(mapUserToProfile(user));
+            }
+          }
+        } else if (error) {
+          console.log('Auth error in useAuth:', error.message);
+          if (isMounted) {
+            setUser(null);
+            setUserProfile(null);
+          }
+        } else {
+          // No user, no error - user is not authenticated
+          if (isMounted) {
+            setUser(null);
+            setUserProfile(null);
+          }
+        }
+      } catch (error) {
+        console.error('Error getting initial user:', error);
+        if (isMounted) {
+          setUser(null);
+          setUserProfile(null);
+        }
+      } finally {
+        clearLoadingTimeout();
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    getInitialUser();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (!isMounted) return;
+        
+        try {
+          if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+            const { data: { user }, error } = await supabase.auth.getUser();
+            if (user && !error && isMounted) {
+              setUser(user);
+              try {
+                const profile = await fetchUserProfile(user);
+                if (isMounted) {
+                  setUserProfile(profile);
+                }
+              } catch (profileError) {
+                console.error('Error fetching profile in auth change:', profileError);
+                if (isMounted) {
+                  setUserProfile(mapUserToProfile(user));
+                }
+              }
+            } else {
+              console.log('Error getting user after auth change:', error?.message);
+              if (isMounted) {
+                setUser(null);
+                setUserProfile(null);
+              }
+            }
+          } else if (event === 'SIGNED_OUT') {
+            if (isMounted) {
+              setUser(null);
+              setUserProfile(null);
+            }
+          }
+        } catch (error) {
+          console.error('Error in auth state change:', error);
+          if (isMounted) {
+            setUser(null);
+            setUserProfile(null);
+          }
+        }
+      }
+    );
+
+    return () => {
+      isMounted = false;
+      clearLoadingTimeout();
+      subscription.unsubscribe();
+    };
+  }, []);
 
   const mapUserToProfile = (user: User): UserProfile => {
     // For Google OAuth users
@@ -178,12 +225,28 @@ export const useAuth = () => {
       setUser(null);
       setUserProfile(null);
       
-      // Sign out from Supabase
-      const { error } = await supabase.auth.signOut();
+      // Sign out from Supabase with proper scope
+      const { error } = await supabase.auth.signOut({
+        scope: 'global' // This ensures all sessions are cleared
+      });
       
       if (error) {
         console.error('Supabase signOut error:', error);
         // Don't throw error, just log it since we already cleared local state
+      }
+
+      // Clear any additional local storage items that might persist
+      if (typeof window !== 'undefined') {
+        // Clear any cached data
+        localStorage.removeItem('supabase.auth.token');
+        sessionStorage.clear();
+        
+        // Clear any cookies by setting them to expire
+        document.cookie.split(";").forEach((c) => {
+          const eqPos = c.indexOf("=");
+          const name = eqPos > -1 ? c.substr(0, eqPos) : c;
+          document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+        });
       }
     } catch (error) {
       console.error('Error during sign out:', error);
@@ -191,10 +254,5 @@ export const useAuth = () => {
     }
   };
 
-  return {
-    user,
-    userProfile,
-    loading,
-    signOut
-  };
+  return { user, userProfile, loading, signOut, refreshUserProfile };
 };

@@ -1,18 +1,21 @@
+// File: src/app/api/program-kerja/[id]/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
-import { getVisiMisiById, updateVisiMisi, deleteVisiMisi, UpdateVisiMisiData } from '@/lib/services/supabase/visi-misi';
+import { getProgramKerjaById, updateProgramKerja, deleteProgramKerja, UpdateProgramKerjaData } from '@/lib/services/supabase/program-kerja';
 import { z } from 'zod';
 
 // Schema untuk validasi input update
-const updateVisiMisiSchema = z.object({
-  kategori: z.enum(['MASJID', 'REMAS', 'MAJLIS_TALIM']).optional(),
-  jenis: z.enum(['VISI', 'MISI']).optional(),
-  konten: z.string().min(10).max(1000).optional(),
-  divisi: z.string().optional().nullable(),
+const updateProgramKerjaSchema = z.object({
+  kategori: z.enum(['PENGURUS_MASJID', 'REMAS', 'MAJLIS_TALIM']).optional(),
+  seksi: z.string().min(2).max(100).optional(),
+  judul: z.string().min(10).max(1000).optional(),
+  deskripsi: z.string().optional().nullable(),
   urutan: z.number().min(1).max(100).optional(),
+  tahun: z.number().optional().nullable(),
   isActive: z.boolean().optional(),
 });
 
-// GET - Ambil visi misi berdasarkan ID
+// GET - Ambil program kerja berdasarkan ID
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -31,7 +34,7 @@ export async function GET(
       );
     }
 
-    const { data, error } = await getVisiMisiById(id);
+    const { data, error } = await getProgramKerjaById(id);
 
     if (error) {
       return NextResponse.json(
@@ -48,18 +51,18 @@ export async function GET(
       data,
     });
   } catch (error) {
-    console.error('Error fetching visi misi:', error);
+    console.error('Error fetching program kerja:', error);
     return NextResponse.json(
       {
         success: false,
-        message: 'Gagal mengambil data visi misi',
+        message: 'Gagal mengambil data program kerja',
       },
       { status: 500 }
     );
   }
 }
 
-// PUT - Update visi misi
+// PUT - Update program kerja
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -81,9 +84,9 @@ export async function PUT(
     const body = await request.json();
     
     // Validasi input
-    const validatedData = updateVisiMisiSchema.parse(body);
+    const validatedData = updateProgramKerjaSchema.parse(body);
 
-    const { data, error } = await updateVisiMisi(id, validatedData as UpdateVisiMisiData);
+    const { data, error } = await updateProgramKerja(id, validatedData as UpdateProgramKerjaData);
 
     if (error) {
       return NextResponse.json(
@@ -97,7 +100,7 @@ export async function PUT(
 
     return NextResponse.json({
       success: true,
-      message: 'Visi misi berhasil diperbarui',
+      message: 'Program kerja berhasil diperbarui',
       data,
     });
   } catch (error) {
@@ -112,18 +115,18 @@ export async function PUT(
       );
     }
 
-    console.error('Error updating visi misi:', error);
+    console.error('Error updating program kerja:', error);
     return NextResponse.json(
       {
         success: false,
-        message: 'Gagal memperbarui visi misi',
+        message: 'Gagal memperbarui program kerja',
       },
       { status: 500 }
     );
   }
 }
 
-// DELETE - Hapus visi misi
+// DELETE - Hapus program kerja
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -142,7 +145,7 @@ export async function DELETE(
       );
     }
 
-    const { success, error } = await deleteVisiMisi(id);
+    const { success, error } = await deleteProgramKerja(id);
 
     if (!success) {
       return NextResponse.json(
@@ -156,14 +159,14 @@ export async function DELETE(
 
     return NextResponse.json({
       success: true,
-      message: 'Visi misi berhasil dihapus',
+      message: 'Program kerja berhasil dihapus',
     });
   } catch (error) {
-    console.error('Error deleting visi misi:', error);
+    console.error('Error deleting program kerja:', error);
     return NextResponse.json(
       {
         success: false,
-        message: 'Gagal menghapus visi misi',
+        message: 'Gagal menghapus program kerja',
       },
       { status: 500 }
     );

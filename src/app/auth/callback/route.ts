@@ -76,8 +76,11 @@ export async function GET(request: NextRequest) {
           // Determine redirect URL based on user role
           let redirectPath = '/'; // Default to main dashboard
           
-          // Redirect ADMIN to admin dashboard
-          if (whitelistEntry.role === 'ADMIN') {
+          // Redirect ADMIN and management roles to admin dashboard
+          const adminRoles = ['ADMIN'];
+          const managementRoles = ['KETUA', 'SEKRETARIS', 'BENDAHARA', 'HUMAS_MEDIA', 'REMAS_ADMIN', 'MAJLIS_TALIM_ADMIN'];
+          
+          if (adminRoles.includes(whitelistEntry.role) || managementRoles.includes(whitelistEntry.role)) {
             redirectPath = '/admin';
           }
           

@@ -6,6 +6,7 @@ import React, { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
+import Image from "next/image";
 
 export default function SignInForm() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
@@ -18,7 +19,7 @@ export default function SignInForm() {
   // Check for error parameters from URL
   useEffect(() => {
     const error = searchParams.get('error');
-    
+
     if (error) {
       switch (error) {
         case 'auth_failed':
@@ -39,7 +40,7 @@ export default function SignInForm() {
         default:
           setErrorMessage('Terjadi kesalahan saat masuk. Silakan coba lagi.');
       }
-      
+
       // Clear error from URL
       const newUrl = new URL(window.location.href);
       newUrl.searchParams.delete('error');
@@ -77,19 +78,36 @@ export default function SignInForm() {
 
 
   return (
-    <div className="flex flex-col flex-1 lg:w-1/2 w-full overflow-y-auto no-scrollbar">
-      <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto">
-        <div>
-          <div className="mb-5 sm:mb-8">
-            <h1 className="mb-2 font-semibold text-gray-800 text-title-sm dark:text-white/90 sm:text-title-md">
+    <div className="w-full max-w-md md:bg-transparent bg-white rounded-3xl md:rounded-none shadow-2xl md:shadow-none p-8 md:p-0">
+      <div className="flex flex-col w-full items-center">
+        {/* Logo - Only visible on mobile */}
+        <div className="md:hidden mb-1 flex justify-center">
+          <Image
+            src="/images/logo.png"
+            alt="Logo Masjid"
+            width={140}
+            height={140}
+            className="object-contain"
+            priority
+          />
+        </div>
+
+        {/* Decorative element for mobile */}
+        <div className="md:hidden mb-2 flex justify-center">
+          <div className="w-20 h-1.5 bg-gradient-to-r from-white via-white to-white rounded-full opacity-40"></div>
+        </div>
+
+        <div className="w-full">
+          <div className="mb-5 sm:mb-8 text-center">
+            <h1 className="mb-2 font-semibold text-gray-800 md:text-gray-800 text-title-sm dark:text-white/90 sm:text-title-md md:text-gray-800">
               Masuk ke Sistem
             </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-sm text-gray-500 md:text-gray-600 dark:text-gray-400">
               Selamat datang! Silakan masuk menggunakan akun Google Anda.
             </p>
           </div>
-          
-          <div className="flex flex-col items-center justify-center space-y-6">
+
+          <div className="flex flex-col items-center justify-center space-y-6 w-full">
             {/* Error Message Display */}
             {errorMessage && (
               <div className="w-full p-4 bg-red-50 border border-red-200 rounded-lg dark:bg-red-900/20 dark:border-red-800">
@@ -111,11 +129,11 @@ export default function SignInForm() {
                 </div>
               </div>
             )}
-            
+
             <button
               onClick={handleGoogleSignIn}
               disabled={isGoogleLoading}
-              className="inline-flex items-center justify-center gap-3 py-4 px-8 text-base font-medium text-gray-700 transition-colors bg-white border-2 border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 dark:bg-gray-800 dark:border-gray-600 dark:text-white dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+              className="w-full inline-flex items-center justify-center gap-3 py-4 px-8 text-base font-medium text-white transition-colors bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 rounded-lg dark:bg-gradient-to-r dark:from-blue-600 dark:to-blue-700 dark:hover:from-blue-700 dark:hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
             >
               {isGoogleLoading ? (
                 <Loader2 className="w-6 h-6 animate-spin" />
@@ -147,12 +165,12 @@ export default function SignInForm() {
               )}
               {isGoogleLoading ? "Menghubungkan..." : "Masuk dengan Google"}
             </button>
-            
+
             <div className="text-center">
-              <p className="text-sm text-gray-500 dark:text-gray-400">
+              <p className="text-sm text-gray-600 md:text-gray-500 dark:text-gray-300">
                 Sistem ini menggunakan autentikasi Google untuk keamanan yang lebih baik.
               </p>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+              <p className="text-xs text-gray-500 md:text-gray-400 dark:text-gray-400 mt-2">
                 Pastikan Anda menggunakan email yang terdaftar di sistem.
               </p>
             </div>

@@ -1,44 +1,42 @@
-// src/components/auth/UserInfoCard.tsx
+// src/components/user-profile/UserInfoCard.tsx
 "use client";
 import React, { useState, useEffect, useRef } from "react";
 import { useModal } from "../../hooks/useModal";
+import { useAuth } from "../../hooks/useAuth";
 import { Modal } from "../ui/modal";
 import Button from "../ui/button/Button";
 import Label from "../form/Label";
-import { createClient } from "@/lib/supabase/client";
-import { toast } from "sonner";
-import { User } from "@supabase/supabase-js";
 import { Loader2 } from "lucide-react";
+import Swal from "sweetalert2";
 
 interface UserProfile {
-  first_name: string;
-  last_name: string;
+  nama: string;
   email: string;
   phone: string;
-  bio: string;
+  alamat: string;
+  jabatan: string;
 }
 
 export default function UserInfoCard() {
   const { isOpen, openModal, closeModal } = useModal();
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, userProfile, loading, refreshUserProfile } = useAuth();
   const [saving, setSaving] = useState(false);
   const [profile, setProfile] = useState<UserProfile>({
-    first_name: "",
-    last_name: "",
+    nama: "",
     email: "",
     phone: "",
-    bio: ""
+    alamat: "",
+    jabatan: ""
   });
 
   // Menggunakan refs untuk mengelola form data
-  const firstNameRef = useRef<HTMLInputElement>(null);
-  const lastNameRef = useRef<HTMLInputElement>(null);
+  const namaRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
-  const bioRef = useRef<HTMLInputElement>(null);
+  const alamatRef = useRef<HTMLInputElement>(null);
+  const jabatanRef = useRef<HTMLInputElement>(null);
 
-  const supabase = createClient();
+  // menggunakan API server untuk menyimpan perubahan profil ke tabel Prisma
 
   // Style untuk input yang konsisten
   const inputClassName = `w-full px-4 py-3 text-sm border border-gray-200 rounded-lg 
@@ -47,93 +45,71 @@ export default function UserInfoCard() {
     placeholder:text-gray-400 dark:placeholder:text-gray-500
     disabled:opacity-50 disabled:cursor-not-allowed`;
 
+  // Update profile state when userProfile from useAuth changes
   useEffect(() => {
-    getUser();
-  }, []);
+    if (userProfile && user) {
+      setProfile({
+        nama: userProfile.nama || `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim() || "",
+        email: userProfile.email || user.email || "",
+        phone: userProfile.phone || "",
+        alamat: userProfile.alamat || "",
+        jabatan: userProfile.jabatan || ""
+      });
+    }
+  }, [userProfile, user]);
 
   // Update refs ketika profile berubah
   useEffect(() => {
-    if (firstNameRef.current) firstNameRef.current.value = profile.first_name;
-    if (lastNameRef.current) lastNameRef.current.value = profile.last_name;
+    if (namaRef.current) namaRef.current.value = profile.nama;
     if (emailRef.current) emailRef.current.value = profile.email;
     if (phoneRef.current) phoneRef.current.value = profile.phone;
-    if (bioRef.current) bioRef.current.value = profile.bio;
+    if (alamatRef.current) alamatRef.current.value = profile.alamat;
+    if (jabatanRef.current) jabatanRef.current.value = profile.jabatan;
   }, [profile]);
-
-  const getUser = async () => {
-    try {
-      const { data: { user }, error } = await supabase.auth.getUser();
-
-      if (error) {
-        console.error("Error getting user:", error);
-        return;
-      }
-
-      if (user) {
-        setUser(user);
-
-        // Set data dari user metadata (untuk Google OAuth) atau profile
-        const userData = user.user_metadata || {};
-        const firstName = userData.first_name || userData.given_name || "";
-        const lastName = userData.last_name || userData.family_name || "";
-
-        setProfile({
-          first_name: firstName,
-          last_name: lastName,
-          email: user.email || "",
-          phone: userData.phone || "",
-          bio: userData.bio || ""
-        });
-      }
-    } catch (error) {
-      console.error("Error:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
 
     // Ambil nilai dari refs
-    const firstName = firstNameRef.current?.value || "";
-    const lastName = lastNameRef.current?.value || "";
+    const nama = namaRef.current?.value || "";
     const phone = phoneRef.current?.value || "";
-    const bio = bioRef.current?.value || "";
+    const alamat = alamatRef.current?.value || "";
 
     setSaving(true);
 
     try {
-      const { error } = await supabase.auth.updateUser({
-        data: {
-          first_name: firstName,
-          last_name: lastName,
-          phone: phone,
-          bio: bio,
-          full_name: `${firstName} ${lastName}`
-        }
+      const res = await fetch('/api/profile/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nama, phone, alamat }),
       });
-
-      if (error) {
-        throw error;
+      const result = await res.json();
+      if (!res.ok || result?.error) {
+        throw new Error(result?.error || 'Gagal memperbarui profile');
       }
 
-      // Update local state
-      setProfile({
-        ...profile,
-        first_name: firstName,
-        last_name: lastName,
-        phone: phone,
-        bio: bio
-      });
+      // Panggil refreshUserProfile untuk memuat ulang data
+      await refreshUserProfile();
 
-      toast.success("Profile berhasil diperbarui!");
+      await Swal.fire({
+        title: "Berhasil!",
+        text: "Profile berhasil diperbarui!",
+        icon: "success",
+        timer: 2000,
+        showConfirmButton: false,
+        timerProgressBar: true
+      });
       closeModal();
 
     } catch (error: any) {
       console.error("Error updating profile:", error);
-      toast.error(error?.message || "Gagal memperbarui profile");
+      await Swal.fire({
+        title: "Gagal!",
+        text: error?.message || "Gagal memperbarui profile",
+        icon: "error",
+        confirmButtonText: "OK"
+      });
     } finally {
       setSaving(false);
     }
@@ -173,19 +149,19 @@ export default function UserInfoCard() {
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-7 2xl:gap-x-32">
             <div>
               <p className="mb-2 text-xs leading-normal text-gray-500 dark:text-gray-400">
-                Nama Depan
+                Nama Lengkap
               </p>
               <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                {profile.first_name || "Belum Diatur"}
+                {profile.nama || "Belum Diatur"}
               </p>
             </div>
 
             <div>
               <p className="mb-2 text-xs leading-normal text-gray-500 dark:text-gray-400">
-                Nama Belakang
+                Jabatan
               </p>
               <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                {profile.last_name || "Belum Diatur"}
+                {profile.jabatan || "Belum Diatur"}
               </p>
             </div>
 
@@ -204,6 +180,15 @@ export default function UserInfoCard() {
               </p>
               <p className="text-sm font-medium text-gray-800 dark:text-white/90">
                 {profile.phone || "Belum Diatur"}
+              </p>
+            </div>
+
+            <div className="col-span-2">
+              <p className="mb-2 text-xs leading-normal text-gray-500 dark:text-gray-400">
+                Alamat
+              </p>
+              <p className="text-sm font-medium text-gray-800 dark:text-white/90">
+                {profile.alamat || "Belum Diatur"}
               </p>
             </div>
           </div>
@@ -250,24 +235,36 @@ export default function UserInfoCard() {
                 </h5>
 
                 <div className="grid grid-cols-1 gap-x-6 gap-y-5 lg:grid-cols-2">
-                  <div className="col-span-2 lg:col-span-1">
-                    <Label>Nama Depan</Label>
+                  <div className="col-span-2">
+                    <Label>Nama Lengkap</Label>
                     <input
-                      ref={firstNameRef}
+                      ref={namaRef}
                       type="text"
-                      name="first_name"
-                      placeholder="Masukkan nama depan"
+                      name="nama"
+                      placeholder="Masukkan nama lengkap"
                       className={inputClassName}
                     />
                   </div>
 
                   <div className="col-span-2 lg:col-span-1">
-                    <Label>Nama Belakang</Label>
+                    <Label>Jabatan</Label>
                     <input
-                      ref={lastNameRef}
+                      ref={jabatanRef}
                       type="text"
-                      name="last_name"
-                      placeholder="Masukkan nama belakang"
+                      name="jabatan"
+                      placeholder="Jabatan diatur otomatis"
+                      className={`${inputClassName} opacity-50 cursor-not-allowed`}
+                      disabled
+                    />
+                  </div>
+
+                  <div className="col-span-2 lg:col-span-1">
+                    <Label>Nomor Telepon</Label>
+                    <input
+                      ref={phoneRef}
+                      type="text"
+                      name="phone"
+                      placeholder="Masukkan nomor telepon"
                       className={inputClassName}
                     />
                   </div>
@@ -283,13 +280,13 @@ export default function UserInfoCard() {
                     <p className="text-xs text-gray-500 mt-1">Email tidak bisa diubah</p>
                   </div>
 
-                  <div className="col-span-2 lg:col-span-1">
-                    <Label>Nomor Telepon</Label>
+                  <div className="col-span-2">
+                    <Label>Alamat</Label>
                     <input
-                      ref={phoneRef}
+                      ref={alamatRef}
                       type="text"
-                      name="phone"
-                      placeholder="Masukkan nomor telepon"
+                      name="alamat"
+                      placeholder="Masukkan alamat lengkap"
                       className={inputClassName}
                     />
                   </div>

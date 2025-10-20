@@ -12,23 +12,29 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="relative p-6 bg-white z-1 dark:bg-gray-900 sm:p-0">
-      <ThemeProvider>
-        <div className="relative flex lg:flex-row w-full h-screen justify-center flex-col  dark:bg-gray-900 sm:p-0">
-          {children}
-          <div className="lg:w-1/2 w-full h-full bg-brand-950 dark:bg-white/5 lg:grid items-center hidden">
-            <div className="relative items-center justify-center  flex z-1">
+    <ThemeProvider>
+      <div className="relative w-full bg-white dark:bg-gray-900">
+        <div className="relative flex flex-col md:flex-row w-full min-h-screen dark:bg-gray-900">
+          {/* Form Section */}
+          <div className="w-full md:w-1/2 flex flex-col items-center justify-center px-6 py-12 md:py-0 min-h-screen md:min-h-auto bg-gradient-to-br from-blue-600 via-blue-500 to-blue-400 md:from-white md:via-white md:to-white dark:from-gray-900 dark:via-gray-900 dark:to-gray-900">
+            {children}
+          </div>
+
+          {/* Logo Section - Hidden on mobile, visible on md and above */}
+          <div className="hidden md:flex md:w-1/2 h-screen bg-brand-950 dark:bg-white/5 items-center justify-center">
+            <div className="relative items-center justify-center flex z-1">
               {/* <!-- ===== Common Grid Shape Start ===== --> */}
               <GridShape />
-              <div className="flex flex-col items-center max-w-xs">
-                <Link href="/" className="block mb-4">
-                  <div className="">
+              <div className="flex flex-col items-center max-w-lg">
+                <Link href="/" className="block mb-1 md:mb-6">
+                  <div className="relative w-[320px] h-[320px] md:w-[280px] md:h-[280px] lg:w-[320px] lg:h-[320px]">
                     <Image
-                      width={231}
-                      height={48}
+                      fill
                       src="/images/logo-masjid-bgwhite.png"
                       alt="Logo Masjid Jawahiruzzarqa"
-                      className="rounded-2xl overflow-hidden"
+                      className="rounded-3xl overflow-hidden object-contain"
+                      sizes="(max-width: 768px) 320px, (max-width: 1024px) 280px, 320px"
+                      priority
                     />
                   </div>
                 </Link>
@@ -38,11 +44,13 @@ export default function AuthLayout({
               </div>
             </div>
           </div>
-          <div className="fixed bottom-6 right-6 z-50 hidden sm:block">
-            <ThemeTogglerTwo />
-          </div>
         </div>
-      </ThemeProvider>
-    </div>
+
+        {/* Theme Toggler */}
+        <div className="fixed bottom-6 right-6 z-50 hidden sm:block">
+          <ThemeTogglerTwo />
+        </div>
+      </div>
+    </ThemeProvider>
   );
 }

@@ -3,7 +3,7 @@
 
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import type { PengurusData } from "@/lib/schema/pengurus/schema";
+import { deletePengurus } from "@/lib/services/supabase/pengurus";
 
 // Helper functions untuk server actions
 async function uploadFotoPengurus(file: File): Promise<string> {
@@ -166,32 +166,15 @@ export async function updatePengurusAction(formData: FormData) {
 // SERVER ACTION - Delete pengurus
 export async function deletePengurusAction(id: number) {
   try {
-    const supabase = await createServerSupabaseClient();
-
     if (!id) {
       return { success: false, error: "ID pengurus tidak valid" };
     }
 
-    // Get foto URL to delete from storage
-    const { data: pengurusData, error: fetchError } = await supabase
-      .from("Pengurus")
-      .select("fotoUrl")
-      .eq("id", id)
-      .single();
+    // Use service layer which uses supabaseAdmin to bypass RLS
+    const result = await deletePengurus(id);
 
-    if (!fetchError && pengurusData?.fotoUrl) {
-      await deleteOldFoto(pengurusData.fotoUrl);
-    }
-
-    // Delete from database
-    const { error } = await supabase
-      .from("Pengurus")
-      .delete()
-      .eq("id", id);
-
-    if (error) {
-      console.error("Error deleting pengurus:", error);
-      return { success: false, error: "Gagal menghapus pengurus" };
+    if (!result.data) {
+      return { success: false, error: result.error || "Gagal menghapus pengurus" };
     }
 
     // Revalidate cache

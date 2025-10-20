@@ -7,7 +7,7 @@ type ProfileData = {
   nama: string;
   jabatan: string;
   role: string;
-  phone?: number;
+  phone?: string;
   alamat?: string;
 };
 
@@ -25,7 +25,7 @@ export async function setupProfile(data: ProfileData) {
 
   // Cek apakah user sudah memiliki profil
   const { data: existingProfile } = await supabase
-    .from("Profile")
+    .from("profile")
     .select("id")
     .eq("userId", user.id)
     .single();
@@ -36,7 +36,7 @@ export async function setupProfile(data: ProfileData) {
 
   // Buat profil baru
   const { data: profile, error } = await supabase
-    .from("Profile")
+    .from("profile")
     .insert({
       userId: user.id,
       ...data,
@@ -66,7 +66,7 @@ export async function updateProfile(id: string, data: Partial<ProfileData>) {
 
   // Cek apakah user memiliki akses untuk mengubah profil
   const { data: profile } = await supabase
-    .from("Profile")
+    .from("profile")
     .select("userId, role")
     .eq("id", id)
     .single();
@@ -79,7 +79,7 @@ export async function updateProfile(id: string, data: Partial<ProfileData>) {
   if (profile.userId !== user.id) {
     // Cek apakah user adalah admin
     const { data: currentUserProfile } = await supabase
-      .from("Profile")
+      .from("profile")
       .select("role")
       .eq("userId", user.id)
       .single();
@@ -91,7 +91,7 @@ export async function updateProfile(id: string, data: Partial<ProfileData>) {
 
   // Update profil
   const { data: updatedProfile, error } = await supabase
-    .from("Profile")
+    .from("profile")
     .update(data)
     .eq("id", id)
     .select()
@@ -125,7 +125,7 @@ export async function uploadProfilePhoto(id: string, file: File) {
 
     // Dapatkan akses ke profil
     const { data: profile } = await supabase
-      .from("Profile")
+      .from("profile")
       .select("userId")
       .eq("id", id)
       .single();
@@ -138,7 +138,7 @@ export async function uploadProfilePhoto(id: string, file: File) {
     if (profile.userId !== user.id) {
       // Cek apakah user adalah admin
       const { data: currentUserProfile } = await supabase
-        .from("Profile")
+        .from("profile")
         .select("role")
         .eq("userId", user.id)
         .single();
@@ -190,7 +190,7 @@ export async function uploadProfilePhoto(id: string, file: File) {
 
     // Update profil dengan URL foto baru
     const { data: updatedProfile, error: updateError } = await supabase
-      .from("Profile")
+      .from("profile")
       .update({ fotoUrl: publicUrl.publicUrl })
       .eq("id", id)
       .select()

@@ -8,15 +8,13 @@ import Button from "../ui/button/Button";
 import Input from "../form/input/InputField";
 import Label from "../form/Label";
 import Image from "next/image";
-import { createClient } from "@/lib/supabase/client";
-import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import Swal from "sweetalert2";
 
 export default function UserMetaCard() {
   const { isOpen, openModal, closeModal } = useModal();
-  const { userProfile, loading } = useAuth();
+  const { user, userProfile, loading, refreshUserProfile } = useAuth();
   const [isUpdating, setIsUpdating] = useState(false);
-  const supabase = createClient();
 
   const handleSave = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -26,26 +24,42 @@ export default function UserMetaCard() {
     const formData = new FormData(event.currentTarget);
 
     try {
-      const updates = {
-        data: {
-          first_name: formData.get('firstName') as string,
-          last_name: formData.get('lastName') as string,
-          full_name: `${formData.get('firstName')} ${formData.get('lastName')}`,
-          phone: formData.get('phone') as string,
-          bio: formData.get('bio') as string,
-          jabatan: formData.get('jabatan') as string,
-        }
+      const payload = {
+        nama: (formData.get('nama') as string) || undefined,
+        phone: (formData.get('phone') as string) || undefined,
+        alamat: (formData.get('alamat') as string) || undefined,
       };
 
-      const { error } = await supabase.auth.updateUser(updates);
+      const res = await fetch('/api/profile/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const result = await res.json();
+      if (!res.ok || result?.error) {
+        throw new Error(result?.error || 'Gagal mengupdate profile');
+      }
 
-      if (error) throw error;
+      // Panggil refreshUserProfile untuk memuat ulang data
+      await refreshUserProfile();
 
-      toast.success("Profile berhasil diupdate!");
+      Swal.fire({
+        title: "Berhasil!",
+        text: "Profile berhasil diupdate!",
+        icon: "success",
+        timer: 2000,
+        showConfirmButton: false,
+        timerProgressBar: true
+      });
       closeModal();
     } catch (error: any) {
       console.error("Error updating profile:", error);
-      toast.error(error?.message || "Gagal mengupdate profile");
+      await Swal.fire({
+        title: "Gagal!",
+        text: error?.message || "Gagal mengupdate profile",
+        icon: "error",
+        confirmButtonText: "OK"
+      });
     } finally {
       setIsUpdating(false);
     }
@@ -90,7 +104,7 @@ export default function UserMetaCard() {
             </div>
             <div className="order-3 xl:order-2">
               <h4 className="mb-2 text-lg font-semibold text-center text-gray-800 dark:text-white/90 xl:text-left">
-                {userProfile.full_name || `${userProfile.first_name} ${userProfile.last_name}` || 'Nama tidak tersedia'}
+                {userProfile.nama || userProfile.full_name || `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim() || 'Nama tidak tersedia'}
               </h4>
               <div className="flex flex-col items-center gap-1 text-center xl:flex-row xl:gap-3 xl:text-left">
                 <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -100,6 +114,41 @@ export default function UserMetaCard() {
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   Role Otomatis diatur berdasarkan jabatan
                 </p>
+              </div>
+              
+              {/* Informasi Kontak - Improved UI */}
+              <div className="mt-4 space-y-2">
+                <div className="flex flex-col items-center gap-2 xl:items-start">
+                  {userProfile.phone && (
+                    <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 w-full xl:w-auto">
+                      <div className="flex items-center justify-center w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-full">
+                        <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                        </svg>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-xs text-gray-500 dark:text-gray-400">Telepon</span>
+                        <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                          {userProfile.phone}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 w-full xl:w-auto">
+                    <div className="flex items-center justify-center w-8 h-8 bg-green-100 dark:bg-green-900/30 rounded-full">
+                      <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-xs text-gray-500 dark:text-gray-400">Email</span>
+                      <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                        {userProfile.email || 'Email tidak tersedia'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
             <div className="flex items-center order-2 gap-2 grow xl:order-3 xl:justify-end">
@@ -148,21 +197,35 @@ export default function UserMetaCard() {
                 </h5>
 
                 <div className="grid grid-cols-1 gap-x-6 gap-y-5 lg:grid-cols-2">
-                  <div className="col-span-2 lg:col-span-1">
-                    <Label>First Name</Label>
+                  <div className="col-span-2">
+                    <Label>Nama Lengkap</Label>
                     <Input
                       type="text"
-                      name="firstName"
-                      defaultValue={userProfile.first_name}
+                      name="nama"
+                      defaultValue={userProfile.nama || userProfile.full_name || `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim()}
+                      placeholder="Masukkan nama lengkap"
                     />
                   </div>
 
                   <div className="col-span-2 lg:col-span-1">
-                    <Label>Last Name</Label>
+                    <Label>Jabatan</Label>
                     <Input
                       type="text"
-                      name="lastName"
-                      defaultValue={userProfile.last_name}
+                      name="jabatan"
+                      defaultValue={userProfile.jabatan}
+                      placeholder="Jabatan diatur otomatis"
+                      disabled
+                      className="opacity-50 cursor-not-allowed"
+                    />
+                  </div>
+
+                  <div className="col-span-2 lg:col-span-1">
+                    <Label>Phone</Label>
+                    <Input
+                      type="text"
+                      name="phone"
+                      defaultValue={userProfile.phone}
+                      placeholder="Masukkan nomor telepon"
                     />
                   </div>
 
@@ -177,33 +240,13 @@ export default function UserMetaCard() {
                     <p className="text-xs text-gray-500 mt-1">Email tidak bisa diubah</p>
                   </div>
 
-                  <div className="col-span-2 lg:col-span-1">
-                    <Label>Phone</Label>
-                    <Input
-                      type="text"
-                      name="phone"
-                      defaultValue={userProfile.phone}
-                      placeholder="Masukkan nomor telepon"
-                    />
-                  </div>
-
-                  <div className="col-span-2 lg:col-span-1">
-                    <Label>Jabatan</Label>
-                    <Input
-                      type="text"
-                      name="jabatan"
-                      defaultValue={(userProfile as any).jabatan}
-                      placeholder="Masukkan jabatan Anda"
-                    />
-                  </div>
-
                   <div className="col-span-2">
-                    <Label>Bio</Label>
+                    <Label>Alamat</Label>
                     <Input
                       type="text"
-                      name="bio"
-                      defaultValue={userProfile.bio}
-                      placeholder="Ceritakan tentang diri Anda"
+                      name="alamat"
+                      defaultValue={userProfile.alamat}
+                      placeholder="Masukkan alamat lengkap"
                     />
                   </div>
                 </div>

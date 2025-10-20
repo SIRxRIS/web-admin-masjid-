@@ -1,10 +1,11 @@
+// src/components/finance/pemasukan/table-donation/schema.ts
 import { z } from "zod";
 
 export const schema = z.object({
   id: z.number(),
   no: z.number(),
   nama: z.string(),
-  alamat: z.string(),
+  alamat: z.string().transform(val => val || "Alamat tidak tersedia"),
   tahun: z.number(),
   jan: z.number(),
   feb: z.number(),
