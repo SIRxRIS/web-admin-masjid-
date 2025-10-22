@@ -7,6 +7,7 @@ import React, { useEffect, useState } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
 import { useAuth } from "../../hooks/useAuth";
+import { createClient } from "@/lib/supabase/client";
 import { Loader2 } from "lucide-react";
 
 export default function UserDropdown() {
@@ -18,11 +19,11 @@ export default function UserDropdown() {
 
   // Debug logging
   useEffect(() => {
-    console.log('UserDropdown render:', { 
-      loading, 
-      hasUser: !!user, 
+    console.log('UserDropdown render:', {
+      loading,
+      hasUser: !!user,
       hasProfile: !!userProfile,
-      userId: user?.id 
+      userId: user?.id
     });
   }, [loading, user, userProfile]);
 
@@ -48,47 +49,35 @@ export default function UserDropdown() {
 
   const handleSignOut = async () => {
     if (isSigningOut) return; // Prevent multiple clicks
-    
+
     setIsSigningOut(true);
     closeDropdown();
-    
+
     try {
-      // Show overlay immediately for better UX
       setShowExitOverlay(true);
-      
-      // Sign out from Supabase
+
+      // Trigger Supabase sign out first so middleware sees the cleared session
       await signOut();
-      
-      // Wait a bit for the signOut to complete
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Force full page reload to ensure complete session cleanup
-      if (typeof window !== 'undefined') {
-        // Clear any remaining client-side state
-        window.localStorage.clear();
-        window.sessionStorage.clear();
-        
-        // Use location.href for a complete page reload
-        window.location.href = '/signin?signedOut=true';
-      } else {
-        router.replace('/signin?signedOut=true');
+
+      // Actively poll for session disappearance to avoid stale tokens
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        const { data } = await createClient().auth.getSession();
+        if (!data.session) {
+          router.replace('/signin?signedOut=true');
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 200));
       }
-      
+
+      router.replace('/signin?signedOut=true');
     } catch (error) {
       console.error('Error signing out:', error);
-      
-      // Even if signOut fails, force full navigation to signin
-      if (typeof window !== 'undefined') {
-        window.location.href = '/signin?signedOut=true';
-      } else {
-        router.replace('/signin?signedOut=true');
-      }
+      router.replace('/signin?signedOut=true');
     } finally {
-      // Reset state after a delay to prevent UI flicker
       setTimeout(() => {
         setIsSigningOut(false);
         setShowExitOverlay(false);
-      }, 1000);
+      }, 600);
     }
   };
 
@@ -207,9 +196,8 @@ export default function UserDropdown() {
               onItemClick={closeDropdown}
               tag="a"
               href="/profile"
-              className={`flex items-center gap-3 px-3 py-2 font-medium text-gray-700 rounded-lg group text-theme-sm hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300 ${
-                loading ? "pointer-events-none opacity-50" : ""
-              }`}
+              className={`flex items-center gap-3 px-3 py-2 font-medium text-gray-700 rounded-lg group text-theme-sm hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300 ${loading ? "pointer-events-none opacity-50" : ""
+                }`}
             >
               <svg
                 className="fill-gray-500 group-hover:fill-gray-700 dark:fill-gray-400 dark:group-hover:fill-gray-300"

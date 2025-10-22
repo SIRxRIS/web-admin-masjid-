@@ -214,15 +214,57 @@ async function getTotalInventarisReal(): Promise<number> {
   }
 }
 
-// Fungsi placeholder untuk data yang belum ada service-nya
+const DEFAULT_CLOUDFLARE_HOSTNAME = "masjidjawahiruzzarqa.siraf.my.id";
+
+function getMonthDateRange(year: number, month: number) {
+  const sinceDate = new Date(Date.UTC(year, month - 1, 1));
+  const untilDate = new Date(Date.UTC(year, month, 1) - 1000);
+  return { since: sinceDate.toISOString(), until: untilDate.toISOString() };
+}
+
+async function fetchCloudflareVisits(year: number, month: number): Promise<number> {
+  const token = process.env.CLOUDFLARE_API_TOKEN;
+  const zoneId = process.env.CLOUDFLARE_ZONE_ID;
+  if (!token || !zoneId) {
+    console.error("Cloudflare credentials are not configured.");
+    return 0;
+  }
+  const hostname = process.env.CLOUDFLARE_TARGET_HOSTNAME ?? DEFAULT_CLOUDFLARE_HOSTNAME;
+  const { since, until } = getMonthDateRange(year, month);
+  const apiEndpoint = `https://api.cloudflare.com/client/v4/zones/${zoneId}/analytics/dashboard`; 
+  const searchParams = new URLSearchParams({
+    since,
+    until,
+    timeseries: "true",
+    filters: `host==${hostname}`,
+  });
+  try {
+    const response = await fetch(`${apiEndpoint}?${searchParams.toString()}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      console.error(`Cloudflare API error: ${response.status} ${response.statusText}`);
+      return 0;
+    }
+    const data = await response.json();
+    const visits = data?.result?.totals?.visits;
+    return typeof visits === "number" ? visits : 0;
+  } catch (error) {
+    console.error("Failed to fetch Cloudflare analytics:", error);
+    return 0;
+  }
+}
+
 async function getPengunjungWebBulanIni(year: number, month: number): Promise<number> {
-  // TODO: Implementasi dengan service function untuk analytics
-  return 2500; // placeholder
+  return fetchCloudflareVisits(year, month);
 }
 
 async function getPengunjungWebBulanLalu(year: number, month: number): Promise<number> {
-  // TODO: Implementasi dengan service function untuk analytics
-  return 2200; // placeholder
+  return fetchCloudflareVisits(year, month);
 }
 
 export default async function DashboardAdmin() {

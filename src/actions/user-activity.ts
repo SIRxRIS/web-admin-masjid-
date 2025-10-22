@@ -1,6 +1,8 @@
 "use server";
 
 import { supabaseAdmin } from "../lib/supabase/admin";
+import { createAuditLog } from "./audit-log";
+import { getProfileByUserIdAdmin } from "../lib/services/supabase/profile/profile";
 import { revalidatePath } from "next/cache";
 
 export interface UserActivityData {
@@ -120,7 +122,8 @@ export async function logUserActivity(
 ) {
   try {
     const supabase = supabaseAdmin;
-    
+    const timestamp = new Date().toISOString();
+
     const { error } = await supabase
       .from("UserActivity")
       .insert({
@@ -129,12 +132,30 @@ export async function logUserActivity(
         details,
         ipAddress,
         userAgent,
-        createdAt: new Date().toISOString(),
+        createdAt: timestamp,
       });
 
     if (error) {
       console.error("Error logging user activity:", error);
+      return;
     }
+
+    await createAuditLog({
+      userId: profileId,
+      action: "CREATE",
+      tableName: "UserActivity",
+      recordId: profileId,
+      newValues: {
+        action,
+        details,
+        ipAddress,
+        userAgent,
+        timestamp,
+      },
+      description: action === "LOGIN_SUCCESS"
+        ? "User login activity recorded"
+        : `User activity recorded: ${action}`,
+    });
   } catch (error) {
     console.error("Error logging user activity:", error);
   }

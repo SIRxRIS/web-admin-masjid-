@@ -2,7 +2,8 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { checkEmailWhitelist } from '@/actions/email-white-list'
-import { createProfileAdmin, getProfileByUserIdAdmin } from '@/lib/services/supabase/profile/profile'
+import { logUserActivity } from '@/actions/user-activity'
+import { createProfileAdmin, getProfileByUserIdAdmin, updateProfileByUserId } from '@/lib/services/supabase/profile/profile'
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
@@ -71,6 +72,24 @@ export async function GET(request: NextRequest) {
           } catch (profileError) {
             console.error('Error handling profile creation:', profileError);
             // Don't block login if profile creation fails, just log the error
+          }
+
+          try {
+            const metadata = user.user_metadata || {};
+            const profile = await getProfileByUserIdAdmin(user.id);
+            if (profile) {
+              await updateProfileByUserId(user.id, {
+                updatedAt: new Date().toISOString(),
+              });
+              await logUserActivity(profile.id, 'LOGIN_SUCCESS', {
+                email: user.email,
+                userId: user.id,
+                fullName: metadata.full_name || metadata.name,
+                provider: user.app_metadata?.provider,
+              });
+            }
+          } catch (activityError) {
+            console.error('Error logging login activity:', activityError);
           }
           
           // Determine redirect URL based on user role

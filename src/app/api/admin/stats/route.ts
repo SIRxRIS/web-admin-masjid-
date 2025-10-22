@@ -60,7 +60,7 @@ async function getOnlineUsersCount(): Promise<number> {
     const { count, error } = await supabaseAdmin
       .from('profile')
       .select('id', { count: 'exact', head: true })
-      .gte('updatedAt', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+      .gte('updated_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
     
     if (error) {
       console.warn('Error counting online users:', error);

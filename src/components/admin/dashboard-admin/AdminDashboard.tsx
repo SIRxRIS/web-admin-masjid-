@@ -204,7 +204,7 @@ export function AdminDashboard() {
 
   const systemStats = [
     {
-      title: "Pengguna Online",
+      title: "Pengguna Login",
       value: loading ? "..." : (stats?.onlineUsers?.toString() || "0"),
       icon: <Activity className="h-5 w-5" />,
       change: loading ? "..." : "Login dalam 24 jam terakhir"
