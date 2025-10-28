@@ -6,7 +6,7 @@ export interface ContentListItem {
   tanggal: string; 
   waktu?: string;
   penulis: string;
-  kategoriId: number;
+  kategori: string;
   fotoUrl?: string;
   penting: boolean;
   no: number;

@@ -2,10 +2,10 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from '@/lib/supabase/server';
- import { EcommerceMetrics } from "@/components/ecommerce/ecommerce-metrics/EcommerceMetrics";
+import { EcommerceMetrics } from "@/components/ecommerce/ecommerce-metrics/EcommerceMetrics";
 import React from "react";
- import MonthlyTarget from "@/components/ecommerce/monthly-target/MonthlyTarget";
- import MonthlySalesChart from "@/components/ecommerce/MonthlySalesChart";
+import MonthlyTarget from "@/components/ecommerce/monthly-target/MonthlyTarget";
+import MonthlySalesChart from "@/components/ecommerce/MonthlySalesChart";
 import {
   getPemasukanBulanan,
   getPemasukanTahunan,
@@ -20,9 +20,13 @@ import {
   getPengeluaranBulanan,
   getPengeluaranTahunan,
 } from "@/lib/services/supabase/pengeluaran/pengeluaran";
-import { getTotalKontenPublished } from "@/lib/services/supabase/konten"; 
+import { getTotalKontenPublished } from "@/lib/services/supabase/konten";
 import { getTotalKotakAmal } from "@/lib/services/supabase/kotak-amal";
 import { getInventarisData } from "@/lib/services/supabase/inventaris/inventaris";
+import {
+  getMonthlyVisitorsFromDatabase,
+  getPreviousMonthVisitorsFromDatabase,
+} from "@/lib/services/supabase/daily-visitor-sync";
 
 export const metadata: Metadata = {
   title: "Dashboard Masjid - Masjid Jawahiruzzarqa",
@@ -35,7 +39,7 @@ async function getUserRole() {
 
   // Gunakan getUser() agar data user terautentikasi oleh Supabase Auth server
   const { data: { user }, error: userError } = await supabase.auth.getUser();
-  
+
   if (userError || !user) {
     console.log('No authenticated user found:', userError?.message);
     redirect('/signin');
@@ -48,12 +52,12 @@ async function getUserRole() {
       .select('role, nama, isActive')
       .eq('email', user.email)
       .single();
-    
+
     if (whitelistError || !whitelistUser || !whitelistUser.isActive) {
       console.error('User not in whitelist or inactive:', user.email);
       redirect('/signin');
     }
-    
+
     return { role: whitelistUser.role, nama: whitelistUser.nama, email: user.email };
   } catch (error) {
     console.error('Error fetching user from whitelist:', error);
@@ -97,6 +101,8 @@ interface DashboardData {
   // Data bulanan lengkap untuk chart
   monthlyData?: Array<{ bulan: number; jumlah: number }>;
 }
+
+
 
 // Service untuk mengambil semua data dashboard
 async function getDashboardData(): Promise<{
@@ -155,8 +161,8 @@ async function getDashboardData(): Promise<{
       getTotalKontenPublished(),
       getTotalInventarisReal(),
       getTotalKotakAmal(currentYear),
-      getPengunjungWebBulanIni(currentYear, currentMonth),
-      getPengunjungWebBulanLalu(prevYear, prevMonth),
+      getMonthlyVisitorsFromDatabase(currentYear, currentMonth),
+      getPreviousMonthVisitorsFromDatabase(),
     ]);
 
     // Buat metrics data
@@ -214,73 +220,20 @@ async function getTotalInventarisReal(): Promise<number> {
   }
 }
 
-const DEFAULT_CLOUDFLARE_HOSTNAME = "masjidjawahiruzzarqa.siraf.my.id";
-
-function getMonthDateRange(year: number, month: number) {
-  const sinceDate = new Date(Date.UTC(year, month - 1, 1));
-  const untilDate = new Date(Date.UTC(year, month, 1) - 1000);
-  return { since: sinceDate.toISOString(), until: untilDate.toISOString() };
-}
-
-async function fetchCloudflareVisits(year: number, month: number): Promise<number> {
-  const token = process.env.CLOUDFLARE_API_TOKEN;
-  const zoneId = process.env.CLOUDFLARE_ZONE_ID;
-  if (!token || !zoneId) {
-    console.error("Cloudflare credentials are not configured.");
-    return 0;
-  }
-  const hostname = process.env.CLOUDFLARE_TARGET_HOSTNAME ?? DEFAULT_CLOUDFLARE_HOSTNAME;
-  const { since, until } = getMonthDateRange(year, month);
-  const apiEndpoint = `https://api.cloudflare.com/client/v4/zones/${zoneId}/analytics/dashboard`; 
-  const searchParams = new URLSearchParams({
-    since,
-    until,
-    timeseries: "true",
-    filters: `host==${hostname}`,
-  });
-  try {
-    const response = await fetch(`${apiEndpoint}?${searchParams.toString()}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      cache: "no-store",
-    });
-    if (!response.ok) {
-      console.error(`Cloudflare API error: ${response.status} ${response.statusText}`);
-      return 0;
-    }
-    const data = await response.json();
-    const visits = data?.result?.totals?.visits;
-    return typeof visits === "number" ? visits : 0;
-  } catch (error) {
-    console.error("Failed to fetch Cloudflare analytics:", error);
-    return 0;
-  }
-}
-
-async function getPengunjungWebBulanIni(year: number, month: number): Promise<number> {
-  return fetchCloudflareVisits(year, month);
-}
-
-async function getPengunjungWebBulanLalu(year: number, month: number): Promise<number> {
-  return fetchCloudflareVisits(year, month);
-}
-
 export default async function DashboardAdmin() {
   const user = await getUserRole();
-  
+
   // Check if user has admin or management access
   const adminRoles = ['ADMIN'];
   const managementRoles = ['KETUA', 'SEKRETARIS', 'BENDAHARA', 'HUMAS_MEDIA', 'REMAS_ADMIN', 'MAJLIS_TALIM_ADMIN'];
-  
+
   if (!adminRoles.includes(user.role || '') && !managementRoles.includes(user.role || '')) {
     // Redirect regular users to main dashboard instead of signin
     redirect('/');
   }
 
   const { data: dashboardData, error } = await getDashboardData();
- 
+
   // Error handling
   if (error || !dashboardData) {
     return (

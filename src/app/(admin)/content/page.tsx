@@ -27,7 +27,7 @@ function transformKontenToContentListItem(konten: KontenData, index: number): Co
     tanggal: safeFormatDate(konten.tanggal, "dd/MM/yyyy"),
     waktu: konten.waktu || undefined,
     penulis: konten.penulis || "",
-    kategoriId: konten.kategoriId,
+    kategori: konten.kategori,
     fotoUrl: konten.fotoUrl || undefined,
     penting: konten.penting,
     no: index + 1,
@@ -56,7 +56,7 @@ async function refreshContentData() {
 
   try {
     const data = await getKontenData();
-    const transformedData = data.map((item, index) => 
+    const transformedData = data.map((item, index) =>
       transformKontenToContentListItem(item, index)
     );
     revalidatePath("/content");
@@ -78,7 +78,7 @@ interface ContentPageData {
 async function getContentPageData(): Promise<ContentPageData> {
   try {
     const data = await getKontenData();
-    const transformedData = data.map((item, index) => 
+    const transformedData = data.map((item, index) =>
       transformKontenToContentListItem(item, index)
     );
 

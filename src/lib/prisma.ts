@@ -1,17 +1,27 @@
 // src/lib/prisma.ts
 import { PrismaClient } from '@prisma/client';
 
-// Deklarasikan variabel global untuk menyimpan instance PrismaClient
+const prismaClientSingleton = () => {
+  return new PrismaClient({
+    log: process.env.NODE_ENV === 'development' 
+      ? ['error', 'warn']
+      : ['error'],
+  });
+};
+
 declare global {
   // eslint-disable-next-line no-var
-  var prisma: PrismaClient | undefined;
+  var prismaGlobal: ReturnType<typeof prismaClientSingleton> | undefined;
 }
 
-// Gunakan instance yang ada atau buat yang baru. Ini mencegah pembuatan instance ganda
-// selama hot-reload di lingkungan pengembangan.
-export const prisma = global.prisma || new PrismaClient();
+export const prisma = globalThis.prismaGlobal ?? prismaClientSingleton();
 
-// Simpan instance di variabel global jika tidak dalam mode produksi.
 if (process.env.NODE_ENV !== 'production') {
-  global.prisma = prisma;
+  globalThis.prismaGlobal = prisma;
+}
+
+if (process.env.NODE_ENV !== 'production' && typeof module !== 'undefined' && module.hot) {
+  module.hot.dispose(() => {
+    prisma.$disconnect();
+  });
 }

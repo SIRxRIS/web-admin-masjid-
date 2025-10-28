@@ -12,14 +12,14 @@ export async function GET(request: NextRequest) {
 
     const supabase = await createServerSupabaseClient();
     let query = supabase
-      .from('laporan_jumat')
+      .from('laporan_jumat_files')
       .select('*')
       .eq('is_public', true)
-      .order('tanggal_laporan', { ascending: false })
+      .order('tanggal', { ascending: false })
       .range(offset, offset + limit - 1);
 
     if (startDate && endDate) {
-      query = query.gte('tanggal_laporan', startDate).lte('tanggal_laporan', endDate);
+      query = query.gte('tanggal', startDate).lte('tanggal', endDate);
     }
 
     const { data: reports, error } = await query;
@@ -34,23 +34,20 @@ export async function GET(request: NextRequest) {
     // Transform data for public API
     const publicReports = reports?.map((report: any) => ({
       id: report.id,
-      tanggalLaporan: report.tanggal_laporan,
+      tanggal: report.tanggal,
+      judul: report.judul,
       fileName: report.file_name,
       fileUrl: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/reports/${report.file_path}`,
-      saldoKasJumatLalu: report.saldo_kas_jumat_lalu,
-      kotakAmalJumat: report.kotak_amal_jumat,
-      totalSumbangan: report.total_sumbangan,
+      saldoKasAwal: report.saldo_kas_awal,
+      totalPemasukan: report.total_pemasukan,
       totalPengeluaran: report.total_pengeluaran,
-      saldoKasHariIni: report.saldo_kas_hari_ini,
-      kasBsi: report.kas_bsi,
-      kasBankSulselbar: report.kas_bank_sulselbar,
-      kasTunai: report.kas_tunai,
+      saldoKasAkhir: report.saldo_kas_akhir,
       khatib: report.khatib,
       muadzdzin: report.muadzdzin,
       imam: report.imam,
       ketuaPengurus: report.ketua_pengurus,
       bendahara: report.bendahara,
-      createdAt: report.created_at
+      uploadedAt: report.uploaded_at
     }));
 
     return NextResponse.json({

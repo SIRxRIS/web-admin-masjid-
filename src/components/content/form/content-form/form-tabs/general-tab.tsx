@@ -66,13 +66,13 @@ export function GeneralTab({ form, isSubmitting }: GeneralTabProps) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <FormField
           control={form.control}
-          name="kategoriId"
+          name="kategori"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Kategori Konten</FormLabel>
               <Select
-                onValueChange={(val) => field.onChange(Number(val))}
-                defaultValue={field.value ? String(field.value) : undefined}
+                onValueChange={(val) => field.onChange(val)}
+                defaultValue={field.value ?? undefined}
                 disabled={isSubmitting}
               >
                 <FormControl>
@@ -83,8 +83,8 @@ export function GeneralTab({ form, isSubmitting }: GeneralTabProps) {
                 <SelectContent>
                   {kategoriKontenContoh.map((kategori) => (
                     <SelectItem
-                      key={kategori.id}
-                      value={String(kategori.id)}
+                      key={kategori.value}
+                      value={String(kategori.value)}
                     >
                       {kategori.label}
                     </SelectItem>

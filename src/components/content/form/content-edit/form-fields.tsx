@@ -77,15 +77,15 @@ export function FormFields({
         <div className="grid grid-cols-2 gap-4">
           <FormField
             control={form.control}
-            name="kategoriId"
+            name="kategori"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>
                   Kategori <span className="text-red-500">*</span>
                 </FormLabel>
                 <Select
-                  onValueChange={(value) => field.onChange(Number(value))}
-                  value={field.value?.toString() || ""}
+                  onValueChange={(value) => field.onChange(value)}
+                  value={field.value || ""}
                   disabled={isSubmitting}
                 >
                   <FormControl>
@@ -96,8 +96,8 @@ export function FormFields({
                   <SelectContent>
                     {kategoriKontenContoh.map((kategori) => (
                       <SelectItem
-                        key={kategori.id}
-                        value={kategori.id.toString()}
+                        key={String(kategori.value)}
+                        value={String(kategori.value)}
                       >
                         {kategori.label}
                       </SelectItem>
@@ -340,6 +340,7 @@ export function FormFields({
           onImageChange={onImageChange}
           onDeleteImage={onDeleteImage}
           isSubmitting={isSubmitting}
+          allowMultiple={true} // Enable multiple image uploads
         />
       </div>
     </div>

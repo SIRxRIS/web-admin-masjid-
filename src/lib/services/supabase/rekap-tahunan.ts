@@ -334,29 +334,29 @@ export async function getRekapPengeluaranTahunan(
   const supabase = await createServerSupabaseClient();
 
   try {
-    const { data: namaArray, error: namaError } = await supabase
+    const { data: allPengeluaranData, error: pengeluaranError } = await supabase
       .from("Pengeluaran")
-      .select("nama")
+      .select("nama, tanggal, jumlah")
       .eq("tahun", tahun);
 
-    if (namaError) throw namaError;
+    if (pengeluaranError) throw pengeluaranError;
 
-    const uniqueNama = [...new Set(namaArray?.map((item) => item.nama))];
-
-    console.log("Nama pengeluaran unik yang ditemukan:", uniqueNama);
-
-    if (!uniqueNama.length) {
+    if (!allPengeluaranData || allPengeluaranData.length === 0) {
       console.log(`Tidak ada data pengeluaran untuk tahun ${tahun}`);
       return [];
     }
 
+    const uniqueNama = [...new Set(allPengeluaranData.map((item) => item.nama))];
+    console.log("Nama pengeluaran unik yang ditemukan:", uniqueNama);
+
     const rekapData: RekapPengeluaran[] = [];
+    let idCounter = 1;
 
-    for (let i = 0; i < uniqueNama.length; i++) {
-      const nama = uniqueNama[i];
-
+    for (const nama of uniqueNama) {
+      const itemsForNama = allPengeluaranData.filter(item => item.nama === nama);
+      
       const rekap: RekapPengeluaran = {
-        id: i + 1,
+        id: idCounter++,
         nama: nama,
         tahun: tahun,
         jan: 0,
@@ -374,20 +374,7 @@ export async function getRekapPengeluaranTahunan(
         total: 0,
       };
 
-      // Ambil semua data pengeluaran untuk nama ini
-      const { data: pengeluaranData, error: pengeluaranError } = await supabase
-        .from("Pengeluaran")
-        .select("tanggal, jumlah")
-        .eq("tahun", tahun)
-        .eq("nama", nama);
-
-      if (pengeluaranError) {
-        console.error(`Error mengambil data pengeluaran untuk ${nama}:`, pengeluaranError);
-        continue;
-      }
-
-      // Hitung total per bulan
-      const monthlyData = calculateMonthlyFromDate(pengeluaranData || [], tahun);
+      const monthlyData = calculateMonthlyFromDate(itemsForNama, tahun);
       
       rekap.jan = monthlyData.jan;
       rekap.feb = monthlyData.feb;
@@ -403,7 +390,9 @@ export async function getRekapPengeluaranTahunan(
       rekap.des = monthlyData.des;
       rekap.total = calculateMonthlyTotal(monthlyData);
 
-      rekapData.push(rekap);
+      if (rekap.total > 0) {
+        rekapData.push(rekap);
+      }
     }
 
     return rekapData;

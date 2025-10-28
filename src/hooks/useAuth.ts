@@ -220,62 +220,48 @@ export const useAuth = () => {
   };
 
   const signOut = async () => {
+    console.log('[useAuth.signOut] Mulai signOut');
+    
     try {
-      // Sign out from Supabase (local scope is enough for browser session)
-      const { error } = await supabase.auth.signOut({ scope: 'local' });
-      if (error) {
-        console.error('Supabase signOut error:', error);
-      }
+      console.log('[useAuth.signOut] Call supabase.auth.signOut dengan 1s timeout');
+      await Promise.race([
+        supabase.auth.signOut({ scope: 'local' }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 1000))
+      ]).catch((e) => {
+        console.warn('[useAuth.signOut] supabase signOut timeout/error, lanjut clear:', e.message);
+      });
+    } catch (e) {
+      console.warn('[useAuth.signOut] unexpected supabase error:', e);
+    }
 
-      // Wait until Supabase confirms the session is gone to avoid race conditions
-      for (let attempt = 0; attempt < 8; attempt += 1) {
-        const { data } = await supabase.auth.getSession();
-        if (!data.session) {
-          break;
-        }
-        await new Promise((resolve) => setTimeout(resolve, 150));
-      }
-
-      // Clear any additional local storage items that might persist
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('supabase.auth.token');
+    if (typeof window !== 'undefined') {
+      try {
+        console.log('[useAuth.signOut] Clear localStorage');
+        localStorage.clear();
         sessionStorage.clear();
+      } catch (e) {
+        console.warn('[useAuth.signOut] storage clear error:', e);
+      }
 
+      try {
+        console.log('[useAuth.signOut] Clear cookies');
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
         if (supabaseUrl) {
-          try {
-            const projectRef = new URL(supabaseUrl).host.split('.')[0];
-            const cookieNames = [
-              `sb-${projectRef}-auth-token`,
-              `sb-${projectRef}-refresh-token`,
-            ];
-            const baseAttributes = `Max-Age=0; path=/; SameSite=Lax`;
-            const secureAttribute = window.location.protocol === 'https:' ? '; Secure' : '';
-
-            cookieNames.forEach((name) => {
-              document.cookie = `${name}=; ${baseAttributes}${secureAttribute}`;
-              document.cookie = `${name}=; ${baseAttributes}${secureAttribute}; domain=${window.location.hostname}`;
-            });
-          } catch (cookieError) {
-            console.warn('Failed to derive Supabase cookie names for cleanup:', cookieError);
-          }
-        }
-
-        // Fallback: clear any other cookies by expiring them
-        document.cookie.split(';').forEach((cookie) => {
-          const eqPos = cookie.indexOf('=');
-          const name = eqPos > -1 ? cookie.substring(0, eqPos).trim() : cookie.trim();
-          if (name) {
+          const projectRef = new URL(supabaseUrl).host.split('.')[0];
+          [`sb-${projectRef}-auth-token`, `sb-${projectRef}-refresh-token`].forEach((name) => {
             document.cookie = `${name}=; Max-Age=0; path=/; SameSite=Lax`;
-          }
-        });
+            document.cookie = `${name}=; Max-Age=0; domain=${window.location.hostname}; path=/; SameSite=Lax`;
+          });
+        }
+      } catch (e) {
+        console.warn('[useAuth.signOut] cookie clear error:', e);
       }
-    } catch (error) {
-      console.error('Error during sign out:', error);
-    } finally {
-      setUser(null);
-      setUserProfile(null);
     }
+
+    console.log('[useAuth.signOut] Clear user state');
+    setUser(null);
+    setUserProfile(null);
+    console.log('[useAuth.signOut] signOut complete');
   };
 
   return { user, userProfile, loading, signOut, refreshUserProfile };

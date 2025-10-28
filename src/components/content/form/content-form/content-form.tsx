@@ -77,7 +77,7 @@ export function ContentForm({
         waktu: data.waktu || undefined,
         lokasi: data.lokasi || undefined,
         penulis: data.penulis,
-        kategoriId: Number(data.kategoriId),
+        kategori: data.kategori,
         donaturId: data.donaturId || undefined,
         kotakAmalId: data.kotakAmalId || undefined,
         penting: data.penting,
@@ -93,8 +93,40 @@ export function ContentForm({
         if (!gambarUtama) return true;
         return file !== gambarUtama.file;
       });
+
+      // Log the data being submitted
+      console.log("Submitting form data:", {
+        kontenData,
+        fileUtama,
+        nonMainImageFiles,
+      });
+
       if (onSubmitData) {
-        await onSubmitData(kontenData, fileUtama, nonMainImageFiles);
+        try {
+          await onSubmitData(kontenData, fileUtama, nonMainImageFiles);
+
+          // Show success toast
+          toast.success("Data konten berhasil disimpan!", {
+            description: `Konten ${data.judul} telah ditambahkan dengan ${gambarKonten.length} foto.`,
+          });
+
+          // Reset form
+          form.reset(defaultValues);
+          setImageFiles([]);
+          setGambarKonten([]);
+
+          // Call success callback
+          if (onSuccess) {
+            onSuccess();
+          }
+        } catch (submitError) {
+          console.error("Error in onSubmitData:", submitError);
+          toast.error("Gagal menyimpan konten", {
+            description: submitError instanceof Error
+              ? submitError.message
+              : "Terjadi kesalahan saat menyimpan konten",
+          });
+        }
       } else {
         console.log("Form submitted but onSubmitData handler not provided", {
           kontenData,
@@ -102,20 +134,22 @@ export function ContentForm({
           nonMainImageFiles,
         });
         toast.info("Form submitted in preview mode");
-      }
 
-      toast.success("Data konten berhasil disimpan!", {
-        description: `Konten ${data.judul} telah ditambahkan dengan ${gambarKonten.length} foto.`,
-      });
+        // In preview mode, we still want to show success and reset
+        toast.success("Data konten berhasil disimpan (preview)!", {
+          description: `Konten ${data.judul} telah ditambahkan dengan ${gambarKonten.length} foto.`,
+        });
 
-      form.reset(defaultValues);
-      setImageFiles([]);
-      setGambarKonten([]);
+        form.reset(defaultValues);
+        setImageFiles([]);
+        setGambarKonten([]);
 
-      if (onSuccess) {
-        onSuccess();
+        if (onSuccess) {
+          onSuccess();
+        }
       }
     } catch (error) {
+      console.error("Error in form submission:", error);
       toast.error("Gagal menyimpan konten", {
         description:
           error instanceof Error

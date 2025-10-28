@@ -4,12 +4,12 @@ import React, { useEffect, useState, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Badge from "@/components/ui/badge/Badge";
-import { 
-  Users, 
-  Mail, 
-  Settings, 
-  Shield, 
-  Database, 
+import {
+  Users,
+  Mail,
+  Settings,
+  Shield,
+  Database,
   Activity,
   UserCheck,
   Globe,
@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
+import { useSupabasePresence } from "@/hooks/useSupabasePresence";
 
 interface AdminStats {
   onlineUsers: number;
@@ -29,6 +30,7 @@ interface AdminStats {
 
 export function AdminDashboard() {
   const { user, userProfile } = useAuth();
+  const onlineUsers = useSupabasePresence();
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +52,7 @@ export function AdminDashboard() {
       console.log('Starting stats fetch...');
       setLoading(true);
       setError(null);
-      
+
       controller = new AbortController();
       const timeoutId = setTimeout(() => {
         console.log('Stats fetch timeout');
@@ -73,14 +75,14 @@ export function AdminDashboard() {
       controller.signal.addEventListener('abort', () => {
         clearTimeout(timeoutId);
       });
-      
+
       // Coba baca dari cache lokal terlebih dahulu untuk render instan
       const cached = typeof window !== 'undefined' ? window.sessionStorage.getItem('admin_stats') : null;
       if (cached) {
         try {
           const parsed = JSON.parse(cached);
           setStats(parsed);
-        } catch {}
+        } catch { }
       }
 
       const response = await fetch('/api/admin/stats', {
@@ -91,17 +93,17 @@ export function AdminDashboard() {
           'Content-Type': 'application/json',
         }
       });
-      
+
       clearTimeout(timeoutId);
       console.log('Stats fetch response:', response.status);
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const result = await response.json();
       console.log('Stats fetch result:', result);
-      
+
       if (result.success) {
         setStats(result.data);
         // Simpan ke cache lokal untuk akses cepat pada refresh berikutnya
@@ -109,7 +111,7 @@ export function AdminDashboard() {
           if (typeof window !== 'undefined') {
             window.sessionStorage.setItem('admin_stats', JSON.stringify(result.data));
           }
-        } catch {}
+        } catch { }
         console.log('Stats updated successfully');
       } else {
         setError(result.message || 'Gagal mengambil data statistik');
@@ -204,10 +206,10 @@ export function AdminDashboard() {
 
   const systemStats = [
     {
-      title: "Pengguna Login",
-      value: loading ? "..." : (stats?.onlineUsers?.toString() || "0"),
+      title: "Pengguna Online",
+      value: onlineUsers?.toString() || "0",
       icon: <Activity className="h-5 w-5" />,
-      change: loading ? "..." : "Login dalam 24 jam terakhir"
+      change: "Real-time presence"
     },
     {
       title: "Email Whitelist",
@@ -251,13 +253,12 @@ export function AdminDashboard() {
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
-          <Badge 
-            variant="outline" 
-            className={`${
-              stats?.systemStatus === 'Online' 
-                ? 'bg-green-50 text-green-700 border-green-200' 
+          <Badge
+            variant="outline"
+            className={`${stats?.systemStatus === 'Online'
+                ? 'bg-green-50 text-green-700 border-green-200'
                 : 'bg-red-50 text-red-700 border-red-200'
-            }`}
+              }`}
           >
             <Activity className="h-3 w-3 mr-1" />
             {loading ? 'Memuat...' : (stats?.systemStatus || 'Unknown')}
@@ -334,7 +335,7 @@ export function AdminDashboard() {
                   <div className={`p-2 rounded-lg ${feature.color} text-white`}>
                     {feature.icon}
                   </div>
-                  <Badge 
+                  <Badge
                     variant={feature.status === "active" ? "default" : "secondary"}
                     className="text-xs"
                   >

@@ -51,6 +51,13 @@ export default async function middleware(request) {
       return supabaseResponse
     }
 
+    // Allow user to access signin if they just signed out
+    const signedOutParam = request.nextUrl.searchParams?.get('signedOut');
+    if (request.nextUrl.pathname === '/signin' && signedOutParam === 'true') {
+      console.log('✅ User sedang logout, akses signin page diizinkan');
+      return supabaseResponse;
+    }
+
     // Get user role for all authenticated routes
     const { data: whitelistUser } = await supabase
       .from('email_whitelist')
@@ -65,8 +72,7 @@ export default async function middleware(request) {
     }
 
     // If user is on signin page and authenticated, redirect based on role
-    // Skip redirect if just signed out (signedOut=true) to avoid loop
-    if (request.nextUrl.pathname === '/signin' && request.nextUrl.searchParams?.get('signedOut') !== 'true') {
+    if (request.nextUrl.pathname === '/signin') {
       // Redirect based on role
       if (whitelistUser.role === 'ADMIN') {
         console.log('🔄 ADMIN user on signin, redirecting to /admin')

@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  productionBrowserSourceMaps: false,
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -8,6 +9,9 @@ const nextConfig = {
   },
   experimental: {
     forceSwcTransforms: false,
+    serverActions: {
+      bodySizeLimit: '10mb',
+    },
   },
   images: {
     remotePatterns: [
@@ -37,6 +41,11 @@ const nextConfig = {
       tls: false,
       crypto: false,
     };
+
+    // Prisma optimization - don't bundle on server
+    if (isServer) {
+      config.externals.push('@prisma/client');
+    }
 
     // Handle SVG files as React components
     config.module.rules.push({

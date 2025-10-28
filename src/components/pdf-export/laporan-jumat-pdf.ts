@@ -4,7 +4,25 @@ import { LaporanJumatExport } from '@/lib/schema/laporan/laporan-jumat-schema';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 
-import { uploadLaporanJumatPDFAction, LaporanJumatMetadata } from '@/actions/laporan-jumat-upload';
+export interface LaporanJumatMetadata {
+  id?: string;
+  tanggal: string;
+  judul: string;
+  file_name: string;
+  file_size?: number;
+  uploaded_at?: string;
+  uploaded_by?: string;
+  is_public: boolean;
+  saldo_kas_awal: number;
+  total_pemasukan: number;
+  total_pengeluaran: number;
+  saldo_kas_akhir: number;
+  khatib?: string;
+  muadzdzin?: string;
+  imam?: string;
+  ketua_pengurus?: string;
+  bendahara?: string;
+}
 
 export async function exportLaporanJumatToPDF(
   data: LaporanJumatExport, 
@@ -63,8 +81,16 @@ export async function exportLaporanJumatToPDF(
     // Upload to Supabase if requested
     let uploadResult = null;
     if (options?.uploadToSupabase) {
-      const pdfBlob = pdf.output('blob');
-      uploadResult = await handleSupabaseUpload(pdfBlob, filename, data, options);
+      try {
+        const pdfBlob = pdf.output('blob');
+        uploadResult = await handleSupabaseUpload(pdfBlob, filename, data, options);
+      } catch (uploadError) {
+        console.error('Upload error in exportLaporanJumatToPDF:', uploadError);
+        uploadResult = { 
+          success: false, 
+          error: uploadError instanceof Error ? uploadError.message : 'Gagal upload ke Supabase' 
+        };
+      }
     }
     
     return { success: true, filename, uploadResult };
@@ -190,7 +216,7 @@ function addSectionA(pdf: jsPDF, startY: number, margin: number, contentWidth: n
 }
 
 /**
- * Helper function to handle Supabase upload
+ * Helper function to handle Supabase upload via Edge Function
  */
 async function handleSupabaseUpload(
   pdfBlob: Blob,
@@ -206,7 +232,7 @@ async function handleSupabaseUpload(
     const saldoAkhir = (data.saldoKasJumatLalu || 0) + totalPemasukan - totalPengeluaran;
 
     // Prepare metadata
-    const metadata: Omit<LaporanJumatMetadata, 'id' | 'uploaded_at' | 'file_path' | 'file_size'> = {
+    const metadata: LaporanJumatMetadata = {
       tanggal: format(data.tanggalLaporan, 'yyyy-MM-dd'),
       judul: `Laporan Keuangan Jumat - ${format(data.tanggalLaporan, 'dd MMMM yyyy', { locale: id })}`,
       file_name: filename.replace('.pdf', ''),
@@ -223,13 +249,48 @@ async function handleSupabaseUpload(
       bendahara: data.bendahara
     };
 
-    // Upload to Supabase using server action
-    const uploadResult = await uploadLaporanJumatPDFAction(pdfBlob, metadata);
-    
+    const arrayBuffer = await pdfBlob.arrayBuffer();
+    const bytes = new Uint8Array(arrayBuffer);
+    let binary = '';
+    const chunkSize = 0x8000;
+
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      const chunk = bytes.subarray(i, i + chunkSize);
+      binary += String.fromCharCode(...chunk);
+    }
+
+    const pdfBase64 = btoa(binary);
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    if (!supabaseUrl) {
+      throw new Error('NEXT_PUBLIC_SUPABASE_URL is not configured');
+    }
+
+    // Call Supabase Edge Function
+    const edgeFunctionUrl = `${supabaseUrl}/functions/v1/export-laporan-jumat`;
+    const response = await fetch(edgeFunctionUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({
+        pdfBase64,
+        metadata,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`Edge function error: ${errorData.message || response.statusText}`);
+    }
+
+    const uploadResult = await response.json();
+
     if (uploadResult.success) {
-      console.log('PDF berhasil diupload ke Supabase:', uploadResult.data);
+      console.log('PDF berhasil diupload melalui Edge Function:', uploadResult.data);
     } else {
-      console.error('Gagal upload PDF ke Supabase:', uploadResult.error);
+      console.error('Gagal upload PDF:', uploadResult.error);
     }
     
     return uploadResult;

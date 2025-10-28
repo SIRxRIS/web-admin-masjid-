@@ -48,32 +48,45 @@ export default function UserDropdown() {
   }
 
   const handleSignOut = async () => {
-    if (isSigningOut) return; // Prevent multiple clicks
+    if (isSigningOut) return;
 
     setIsSigningOut(true);
     closeDropdown();
 
+    const startTime = Date.now();
+    
+    console.log('[LOGOUT] Mulai proses logout...');
+
     try {
       setShowExitOverlay(true);
+      console.log('[LOGOUT] Overlay ditampilkan');
 
-      // Trigger Supabase sign out first so middleware sees the cleared session
-      await signOut();
-
-      // Actively poll for session disappearance to avoid stale tokens
-      for (let attempt = 0; attempt < 10; attempt += 1) {
-        const { data } = await createClient().auth.getSession();
-        if (!data.session) {
-          router.replace('/signin?signedOut=true');
-          return;
-        }
-        await new Promise((resolve) => setTimeout(resolve, 200));
+      console.log('[LOGOUT] Memanggil signOut dengan timeout 3s...');
+      const signOutStartTime = Date.now();
+      
+      const signOutPromise = signOut();
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('signOut timeout')), 3000)
+      );
+      
+      try {
+        await Promise.race([signOutPromise, timeoutPromise]);
+        console.log('[LOGOUT] signOut selesai dalam', Date.now() - signOutStartTime, 'ms');
+      } catch (e) {
+        console.warn('[LOGOUT] signOut timeout or error, continuing anyway:', e);
       }
 
+      console.log('[LOGOUT] Redirect ke signin page...');
       router.replace('/signin?signedOut=true');
+      
     } catch (error) {
-      console.error('Error signing out:', error);
+      console.error('[LOGOUT] Error saat logout:', error);
+      console.log('[LOGOUT] Force redirect ke signin page...');
       router.replace('/signin?signedOut=true');
     } finally {
+      const totalTime = Date.now() - startTime;
+      console.log('[LOGOUT] Proses logout memakan waktu', totalTime, 'ms');
+      
       setTimeout(() => {
         setIsSigningOut(false);
         setShowExitOverlay(false);

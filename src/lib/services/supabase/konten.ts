@@ -59,9 +59,9 @@ function processContentFormData(inputData: ContentFormInputValues): ContentFormV
   // Transform input data ke format yang sesuai schema
   const processedData: ContentFormValues = {
     judul: inputData.judul.trim(),
-    kategoriId: typeof inputData.kategoriId === 'string' 
-      ? parseInt(inputData.kategoriId, 10) 
-      : inputData.kategoriId,
+    kategori: typeof (inputData as any).kategori === 'string'
+      ? (inputData as any).kategori
+      : (inputData as any).kategori,
     tanggal: typeof inputData.tanggal === 'string' 
       ? new Date(inputData.tanggal) 
       : inputData.tanggal,
@@ -90,26 +90,72 @@ function processContentFormData(inputData: ContentFormInputValues): ContentFormV
 async function uploadGambarKonten(file: File): Promise<string> {
   const supabase = supabaseAdmin;
 
-  const fileExt = file.name.split(".").pop();
-  const filePath = generateFileName("konten") + `.${fileExt}`;
+  try {
+    // Validate file
+    if (!file) {
+      throw new Error("File tidak valid");
+    }
+    
+    // Check file size (max 2MB)
+    const fileSizeInMB = file.size / (1024 * 1024);
+    if (fileSizeInMB > 2) {
+      throw new Error("Ukuran file terlalu besar (maksimal 2MB)");
+    }
+    
+    // Check file type
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+    if (!validTypes.includes(file.type)) {
+      throw new Error("Format file tidak didukung (hanya JPG, JPEG, dan PNG)");
+    }
 
-  const { error: uploadError } = await supabase.storage
-    .from("images")
-    .upload(filePath, file, {
-      cacheControl: "3600",
-      upsert: false,
-    });
+    // Get file extension and generate path
+    const fileExt = file.name.split(".").pop() || "jpg";
+    const filePath = generateFileName("konten") + `.${fileExt}`;
 
-  if (uploadError) {
-    console.error("Upload error:", JSON.stringify(uploadError, null, 2));
-    throw new Error("Gagal upload gambar");
+    try {
+      // Upload file to storage
+      const { error: uploadError } = await supabase.storage
+        .from("images")
+        .upload(filePath, file, {
+          cacheControl: "3600",
+          upsert: false,
+        });
+
+      if (uploadError) {
+        console.error("Upload error:", JSON.stringify(uploadError, null, 2));
+        throw new Error(`Gagal upload gambar: ${uploadError.message}`);
+      }
+
+      // Get public URL
+      const { data: publicUrlData } = supabase.storage
+        .from("images")
+        .getPublicUrl(filePath);
+
+      if (!publicUrlData?.publicUrl) {
+        throw new Error("Gagal mendapatkan URL gambar");
+      }
+
+      return publicUrlData.publicUrl;
+    } catch (uploadError) {
+      console.error("Error during file upload:", uploadError);
+      // Make sure we're not returning HTML error responses
+      if (typeof uploadError === 'string' && uploadError.includes('<!DOCTYPE')) {
+        throw new Error("Terjadi kesalahan pada server saat mengunggah gambar");
+      }
+      throw uploadError instanceof Error 
+        ? uploadError 
+        : new Error("Gagal upload gambar: Unexpected error");
+    }
+  } catch (error) {
+    console.error("Error in uploadGambarKonten:", error);
+    // Make sure we're not returning HTML error responses
+    if (typeof error === 'string' && error.includes('<!DOCTYPE')) {
+      throw new Error("Terjadi kesalahan pada server saat memproses gambar");
+    }
+    throw error instanceof Error 
+      ? error 
+      : new Error("Gagal upload gambar: Unexpected error");
   }
-
-  const { data: publicUrlData } = supabase.storage
-    .from("images")
-    .getPublicUrl(filePath);
-
-  return publicUrlData?.publicUrl ?? "";
 }
 
 async function deleteOldGambar(gambarUrl: string) {
@@ -174,7 +220,7 @@ export async function createKontenWithFoto(
 ) {
   try {
     const supabase = supabaseAdmin;
-    let fotoUrl = "/images/profile.jpg";
+    let fotoUrl: string | null = null;
 
     if (file) {
       fotoUrl = await uploadGambarKonten(file);
@@ -234,56 +280,113 @@ export async function updateKontenWithOptionalFoto(
   const supabase = supabaseAdmin;
   let fotoUrl: string | undefined;
 
-  if (file) {
-    const { data: oldData, error: oldDataError } = await supabase
-      .from("konten")
-      .select("fotoUrl")
-      .eq("id", id)
-      .single();
+  try {
+    // Process image if provided
+    if (file) {
+      try {
+        // Get old data to delete previous image if exists
+        const { data: oldData, error: oldDataError } = await supabase
+          .from("konten")
+          .select("fotoUrl")
+          .eq("id", id)
+          .single();
 
-    if (oldDataError) {
-      console.error("Error fetching old konten data:", oldDataError);
-      throw new Error("Gagal mengambil data konten lama");
-    }
-    if (oldData?.fotoUrl) {
-      await deleteOldGambar(oldData.fotoUrl);
-    }
-    fotoUrl = await uploadGambarKonten(file);
-  }
-
-  // Handle tags jika ada dalam updates
-  const { tags, ...otherUpdates } = updates;
-
-  const { data, error } = await supabase
-    .from("konten")
-    .update({
-      ...otherUpdates,
-      ...(fotoUrl ? { fotoUrl } : {}),
-      updatedAt: new Date().toISOString(),
-    })
-    .eq("id", id)
-    .select();
-
-  if (error) {
-    console.error("Error updating konten:", error);
-    throw new Error("Gagal update konten");
-  }
-
-  // Update tags jika ada
-  if (tags !== undefined) {
-    // Hapus semua tags lama
-    await supabase.from("konten_tag_konten").delete().eq("kontenId", id);
-
-    // Tambah tags baru jika ada
-    if (tags.length > 0) {
-      const tagIds = await processTagsForKonten(id, tags);
-      if (tagIds.length > 0) {
-        await addTagsToKonten(id, tagIds);
+        if (oldDataError) {
+          console.error("Error fetching old konten data:", oldDataError);
+          throw new Error("Gagal mengambil data konten lama");
+        }
+        
+        // Delete old image if exists
+        if (oldData?.fotoUrl) {
+          try {
+            await deleteOldGambar(oldData.fotoUrl);
+          } catch (deleteError) {
+            console.error("Error deleting old image, continuing anyway:", deleteError);
+            // Continue even if delete fails
+          }
+        }
+        
+        // Upload new image
+        fotoUrl = await uploadGambarKonten(file);
+      } catch (imageError) {
+        console.error("Error processing image:", imageError);
+        
+        // Check for HTML error responses
+        if (typeof imageError === 'string' && imageError.includes('<!DOCTYPE')) {
+          throw new Error("Terjadi kesalahan pada server saat memproses gambar");
+        }
+        
+        throw new Error("Gagal memproses gambar: " + (imageError instanceof Error ? imageError.message : "Unknown error"));
       }
     }
-  }
 
-  return data?.[0];
+    // Handle tags jika ada dalam updates
+    const { tags, ...otherUpdates } = updates;
+
+    try {
+      // Update konten in database
+      const { data, error } = await supabase
+        .from("konten")
+        .update({
+          ...otherUpdates,
+          ...(fotoUrl ? { fotoUrl } : {}),
+          updatedAt: new Date().toISOString(),
+        })
+        .eq("id", id)
+        .select();
+
+      if (error) {
+        console.error("Error updating konten:", error);
+        throw new Error("Gagal update konten: " + error.message);
+      }
+
+      // Update tags jika ada
+      if (tags !== undefined) {
+        try {
+          // Hapus semua tags lama
+          await supabase.from("konten_tag_konten").delete().eq("kontenId", id);
+
+          // Tambah tags baru jika ada
+          if (tags.length > 0) {
+            const tagIds = await processTagsForKonten(id, tags);
+            if (tagIds.length > 0) {
+              await addTagsToKonten(id, tagIds);
+            }
+          }
+        } catch (tagError) {
+          console.error("Error updating tags:", tagError);
+          // Don't fail the whole operation if tag update fails
+        }
+      }
+
+      return data?.[0];
+    } catch (dbError) {
+      console.error("Database error in updateKontenWithOptionalFoto:", dbError);
+      
+      // Check for HTML error responses
+      if (typeof dbError === 'string' && dbError.includes('<!DOCTYPE')) {
+        throw new Error("Terjadi kesalahan pada server saat menyimpan data");
+      }
+      
+      throw dbError instanceof Error 
+        ? dbError 
+        : new Error("Gagal mengupdate konten: Unexpected database error");
+    }
+  } catch (error) {
+    console.error("Error in updateKontenWithOptionalFoto:", error);
+    
+    // Check for HTML error responses
+    if (typeof error === 'string' && error.includes('<!DOCTYPE')) {
+      throw new Error("Terjadi kesalahan pada server");
+    }
+    
+    // Make sure we're not returning HTML error pages
+    if (error instanceof Error) {
+      throw error;
+    } else {
+      throw new Error("Gagal mengupdate konten: Unexpected error");
+    }
+  }
 }
 
 // ✅ CRUD Functions
@@ -345,11 +448,7 @@ export async function getKontenWithRelations(id: number): Promise<KontenData> {
     .from("konten")
     .select(`
       *,
-      kategori:kategoriId (
-        id,
-        nama,
-        slug
-      ),
+      kategori,
       donatur:donaturId (
         id,
         nama
@@ -695,14 +794,14 @@ export async function getTagsByKontenId(
 
 // ✅ Additional Functions
 export async function getKontenByKategori(
-  kategoriId: number
+  kategori: string
 ): Promise<KontenData[]> {
   const supabase = supabaseAdmin;
 
   const { data, error } = await supabase
     .from("konten")
     .select("*")
-    .eq("kategoriId", kategoriId)
+    .eq("kategori", kategori)
     .order("tanggal", { ascending: false });
 
   if (error) {
@@ -821,8 +920,9 @@ export async function createGambarKonten(
 
   for (const gambar of gambarData) {
     try {
-      // Generate unique filename
-      const fileName = generateFileName(gambar.file.name);
+      // Get file extension and generate unique filename
+      const fileExt = gambar.file.name.split(".").pop() || "jpg";
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
       const filePath = `konten/${fileName}`;
 
       // Upload file to Supabase storage
@@ -846,6 +946,7 @@ export async function createGambarKonten(
       uploadedImages.push({
         kontenId,
         url: urlData.publicUrl,
+        filename: fileName, // Add the filename field
         caption: gambar.caption,
         urutan: gambar.urutan,
         isUtama: gambar.isUtama,

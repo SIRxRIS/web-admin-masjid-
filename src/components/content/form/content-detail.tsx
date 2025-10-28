@@ -17,36 +17,36 @@ interface ContentDetailProps {
   onBack: () => void;
 }
 
-const getBadgeVariant = (kategoriId: number) => {
-  const variants: Record<number, string> = {
-    1: "bg-blue-100 text-blue-800 hover:bg-blue-200", // kegiatan
-    2: "bg-purple-100 text-purple-800 hover:bg-purple-200", // pengumuman
-    3: "bg-green-100 text-green-800 hover:bg-green-200", // kajian
-    4: "bg-yellow-100 text-yellow-800 hover:bg-yellow-200", // tpa
-    5: "bg-pink-100 text-pink-800 hover:bg-pink-200", // lomba
-    6: "bg-indigo-100 text-indigo-800 hover:bg-indigo-200", // ramadhan
-    7: "bg-teal-100 text-teal-800 hover:bg-teal-200", // idul_fitri
-    8: "bg-orange-100 text-orange-800 hover:bg-orange-200", // idul_adha
-    9: "bg-red-100 text-red-800 hover:bg-red-200", // baksos
+const getBadgeVariant = (kategori: string) => {
+  const variants: Record<string, string> = {
+    KEGIATAN_MASJID: "bg-blue-100 text-blue-800 hover:bg-blue-200",
+    PENGUMUMAN: "bg-purple-100 text-purple-800 hover:bg-purple-200",
+    KAJIAN_RUTIN: "bg-green-100 text-green-800 hover:bg-green-200",
+    KEGIATAN_TPQ_TPA: "bg-yellow-100 text-yellow-800 hover:bg-yellow-200",
+    LOMBA_DAN_ACARA: "bg-pink-100 text-pink-800 hover:bg-pink-200",
+    PROGRAM_RAMADHAN: "bg-indigo-100 text-indigo-800 hover:bg-indigo-200",
+    IDUL_FITRI: "bg-teal-100 text-teal-800 hover:bg-teal-200",
+    IDUL_ADHA: "bg-orange-100 text-orange-800 hover:bg-orange-200",
+    BAKTI_SOSIAL: "bg-red-100 text-red-800 hover:bg-red-200",
   };
 
-  return variants[kategoriId] || "bg-gray-100 text-gray-800 hover:bg-gray-200";
+  return variants[kategori] || "bg-gray-100 text-gray-800 hover:bg-gray-200";
 };
 
-const getKategoriLabel = (kategoriId: number) => {
-  const labels: Record<number, string> = {
-    1: "Kegiatan Masjid",
-    2: "Pengumuman",
-    3: "Kajian Rutin",
-    4: "Kegiatan TPQ/TPA",
-    5: "Lomba dan Acara",
-    6: "Program Ramadhan",
-    7: "Idul Fitri",
-    8: "Idul Adha",
-    9: "Bakti Sosial",
+const getKategoriLabel = (kategori: string) => {
+  const labels: Record<string, string> = {
+    KEGIATAN_MASJID: "Kegiatan Masjid",
+    PENGUMUMAN: "Pengumuman",
+    KAJIAN_RUTIN: "Kajian Rutin",
+    KEGIATAN_TPQ_TPA: "Kegiatan TPQ/TPA",
+    LOMBA_DAN_ACARA: "Lomba dan Acara",
+    PROGRAM_RAMADHAN: "Program Ramadhan",
+    IDUL_FITRI: "Idul Fitri",
+    IDUL_ADHA: "Idul Adha",
+    BAKTI_SOSIAL: "Bakti Sosial",
   };
 
-  return labels[kategoriId] || "Lainnya";
+  return labels[kategori] || "Lainnya";
 };
 
 export function ContentDetail({ content, onBack }: ContentDetailProps) {
@@ -74,8 +74,8 @@ export function ContentDetail({ content, onBack }: ContentDetailProps) {
 
         <div className="flex flex-wrap justify-between items-start mb-4">
           <div>
-            <Badge className={getBadgeVariant(content.kategoriId)}>
-              {getKategoriLabel(content.kategoriId)}
+            <Badge className={getBadgeVariant(content.kategori)}>
+              {getKategoriLabel(content.kategori)}
             </Badge>
             {content.penting && (
               <Badge className="ml-2 bg-red-600">Penting</Badge>

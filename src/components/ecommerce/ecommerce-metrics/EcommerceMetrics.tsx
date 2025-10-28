@@ -292,7 +292,7 @@ export const EcommerceMetrics: React.FC<EcommerceMetricsProps> = ({
                                 Jumlah Kotak Amal
                             </span>
                             <h4 className="mt-2 font-bold text-gray-800 text-title-sm dark:text-white/90">
-                                {formatNumber(metricsData.totalKotakAmal)} 
+                                {formatNumber(metricsData.totalKotakAmal)}
                             </h4>
                         </div>
                         <Badge color={kotakAmalBadgeProps.color}>
@@ -314,7 +314,7 @@ export const EcommerceMetrics: React.FC<EcommerceMetricsProps> = ({
                                 Pengunjung Web {getMonthName(currentMonth)} {currentYear}
                             </span>
                             <h4 className="mt-2 font-bold text-gray-800 text-title-sm dark:text-white/90">
-                                {formatNumber(metricsData.totalPengunjungWeb)} 
+                                {formatNumber(metricsData.totalPengunjungWeb)}
                             </h4>
                         </div>
                         <Badge color={pengunjungWebBadgeProps.color}>

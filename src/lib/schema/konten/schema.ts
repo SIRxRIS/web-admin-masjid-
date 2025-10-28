@@ -8,10 +8,23 @@ export enum StatusKonten {
   REVIEWED = "REVIEWED",
 }
 
+// New enum for kategori konten (string-based)
+export enum KategoriKontenEnum {
+  KEGIATAN_MASJID = "KEGIATAN_MASJID",
+  PENGUMUMAN = "PENGUMUMAN",
+  KAJIAN_RUTIN = "KAJIAN_RUTIN",
+  KEGIATAN_TPQ_TPA = "KEGIATAN_TPQ_TPA",
+  LOMBA_DAN_ACARA = "LOMBA_DAN_ACARA",
+  PROGRAM_RAMADHAN = "PROGRAM_RAMADHAN",
+  IDUL_FITRI = "IDUL_FITRI",
+  IDUL_ADHA = "IDUL_ADHA",
+  BAKTI_SOSIAL = "BAKTI_SOSIAL",
+}
+
 // ✅ Main Schema - Simple & Effective
 export const ContentFormSchema = z.object({
   judul: z.string().min(3, "Judul minimal 3 karakter").max(200).trim(),
-  kategoriId: z.number().min(1, "Kategori wajib dipilih"),
+  kategori: z.nativeEnum(KategoriKontenEnum),
   tanggal: z.date(),
   deskripsi: z.string().min(10, "Deskripsi minimal 10 karakter").max(5000).trim(),
   penulis: z.string().max(100).trim().nullable().optional(),
@@ -32,7 +45,7 @@ export const ContentFormSchema = z.object({
 export function convertKontenDataToFormValues(content: KontenData): ContentFormValues {
   return {
     judul: content.judul,
-    kategoriId: content.kategoriId,
+    kategori: content.kategori,
     tanggal: new Date(content.tanggal),
     deskripsi: content.deskripsi,
     penulis: content.penulis,
@@ -59,7 +72,7 @@ export interface KontenDataWithTags extends KontenData {
 export function createContentEditForm(content: KontenDataWithTags): ContentFormValues {
   return {
     judul: content.judul,
-    kategoriId: content.kategoriId,
+    kategori: content.kategori,
     tanggal: new Date(content.tanggal),
     deskripsi: content.deskripsi,
     penulis: content.penulis,
@@ -79,10 +92,10 @@ export function createContentEditForm(content: KontenDataWithTags): ContentFormV
 
 // ✅ Form Input Schema with Transformations
 export const ContentFormInputSchema = ContentFormSchema.extend({
-  kategoriId: z.union([
-    z.string().transform(val => parseInt(val, 10)),
-    z.number()
-  ]).pipe(z.number().min(1)),
+  kategori: z.union([
+    z.string(),
+    z.nativeEnum(KategoriKontenEnum)
+  ]).pipe(z.nativeEnum(KategoriKontenEnum)),
   
   tanggal: z.union([
     z.string().transform(val => new Date(val)),
@@ -118,7 +131,7 @@ export type ContentFormInputValues = z.infer<typeof ContentFormInputSchema>;
 // ✅ Clean Default Values
 export const defaultValues: ContentFormValues = {
   judul: "",
-  kategoriId: 1,
+  kategori: KategoriKontenEnum.KEGIATAN_MASJID,
   tanggal: new Date(),
   deskripsi: "",
   penulis: null,
@@ -145,7 +158,7 @@ export interface KontenData {
   waktu: string | null;
   lokasi: string | null;
   penulis: string | null;
-  kategoriId: number;
+  kategori: KategoriKontenEnum;
   donaturId: number | null;
   kotakAmalId: number | null;
   penting: boolean;
@@ -217,13 +230,13 @@ export const statusOptions = [
 ];
 
 export const kategoriKontenContoh = [
-  { id: 1, label: "Kegiatan Masjid" },
-  { id: 2, label: "Pengumuman" },
-  { id: 3, label: "Kajian Rutin" },
-  { id: 4, label: "Kegiatan TPQ/TPA" },
-  { id: 5, label: "Lomba dan Acara" },
-  { id: 6, label: "Program Ramadhan" },
-  { id: 7, label: "Idul Fitri" },
-  { id: 8, label: "Idul Adha" },
-  { id: 9, label: "Bakti Sosial" },
+  { value: KategoriKontenEnum.KEGIATAN_MASJID, label: "Kegiatan Masjid" },
+  { value: KategoriKontenEnum.PENGUMUMAN, label: "Pengumuman" },
+  { value: KategoriKontenEnum.KAJIAN_RUTIN, label: "Kajian Rutin" },
+  { value: KategoriKontenEnum.KEGIATAN_TPQ_TPA, label: "Kegiatan TPQ/TPA" },
+  { value: KategoriKontenEnum.LOMBA_DAN_ACARA, label: "Lomba dan Acara" },
+  { value: KategoriKontenEnum.PROGRAM_RAMADHAN, label: "Program Ramadhan" },
+  { value: KategoriKontenEnum.IDUL_FITRI, label: "Idul Fitri" },
+  { value: KategoriKontenEnum.IDUL_ADHA, label: "Idul Adha" },
+  { value: KategoriKontenEnum.BAKTI_SOSIAL, label: "Bakti Sosial" },
 ];

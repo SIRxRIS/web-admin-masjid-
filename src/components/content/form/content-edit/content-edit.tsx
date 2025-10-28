@@ -20,6 +20,7 @@ import {
 } from "@/lib/schema/konten/schema";
 import { updateKontenWithOptionalFoto } from "@/actions/content";
 import Swal from "sweetalert2";
+import { toast } from "sonner";
 
 interface ContentEditProps {
   content: KontenDataWithTags;
@@ -40,6 +41,8 @@ export function ContentEdit({
     content.fotoUrl || null
   );
   const [isImageDeleted, setIsImageDeleted] = useState(false);
+  // New state for additional images
+  const [additionalImages, setAdditionalImages] = useState<File[]>([]);
 
   const form = useForm<ContentFormValues>({
     resolver: zodResolver(ContentFormSchema),
@@ -62,12 +65,33 @@ export function ContentEdit({
   }, []);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const fileUrl = URL.createObjectURL(file);
-      setSelectedImage(fileUrl);
-      setPreviewImage(fileUrl);
-      setIsImageDeleted(false);
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    // Handle the first file as the main image
+    const mainFile = files[0];
+    const fileUrl = URL.createObjectURL(mainFile);
+    setSelectedImage(fileUrl);
+    setPreviewImage(fileUrl);
+    setIsImageDeleted(false);
+
+    // If there are multiple files, store the additional ones
+    if (files.length > 1) {
+      const newAdditionalImages: File[] = [];
+      for (let i = 1; i < files.length; i++) {
+        newAdditionalImages.push(files[i]);
+      }
+
+      // Add to existing additional images
+      setAdditionalImages(prev => [...prev, ...newAdditionalImages]);
+
+      // Show notification about additional images
+      if (newAdditionalImages.length > 0) {
+        toast.success(`${newAdditionalImages.length} gambar tambahan berhasil dipilih`, {
+          description: "Gambar tambahan akan diunggah saat Anda menyimpan perubahan.",
+          duration: 4000,
+        });
+      }
     }
   };
 
@@ -125,12 +149,12 @@ export function ContentEdit({
     });
   };
 
-  const showSuccessAlert = () => {
+  const showSuccessAlert = (message: string = "Konten berhasil diperbarui") => {
     Swal.fire({
       position: "center",
       icon: "success",
       title: "Berhasil!",
-      text: "Konten berhasil diperbarui",
+      text: message,
       showConfirmButton: false,
       timer: 1500,
       showClass: {
@@ -162,15 +186,40 @@ export function ContentEdit({
   const prepareFileForUpload = async (
     imageUrl: string
   ): Promise<File | undefined> => {
+    // If it's not a blob URL (e.g., it's a remote URL or data URL), return undefined
     if (!imageUrl.startsWith("blob:")) return undefined;
 
     try {
+      // Fetch the blob from the URL
       const response = await fetch(imageUrl);
+
+      // Check if the fetch was successful
+      if (!response.ok) {
+        throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+      }
+
+      // Get the blob from the response
       const blob = await response.blob();
-      return new File([blob], "foto.jpg", { type: blob.type });
+
+      // Validate the blob type
+      if (!blob.type.startsWith('image/')) {
+        throw new Error(`Invalid image type: ${blob.type}`);
+      }
+
+      // Check file size (max 2MB)
+      const fileSizeInMB = blob.size / (1024 * 1024);
+      if (fileSizeInMB > 2) {
+        throw new Error("Ukuran file terlalu besar (maksimal 2MB)");
+      }
+
+      // Create a file from the blob
+      const fileName = `foto_${Date.now()}.${blob.type.split('/')[1] || 'jpg'}`;
+      return new File([blob], fileName, { type: blob.type });
     } catch (error) {
       console.error("Error saat memproses gambar:", error);
-      throw new Error("Gagal memproses gambar");
+      throw new Error(error instanceof Error ?
+        `Gagal memproses gambar: ${error.message}` :
+        "Gagal memproses gambar");
     }
   };
 
@@ -183,7 +232,7 @@ export function ContentEdit({
       const updatedContent: Partial<ContentFormValues> = {
         judul: values.judul,
         deskripsi: values.deskripsi,
-        kategoriId: values.kategoriId,
+        kategori: values.kategori,
         penting: values.penting,
         tanggal: values.tanggal,
         waktu: values.waktu || null,
@@ -198,9 +247,20 @@ export function ContentEdit({
 
       let fileForUpload: File | undefined;
 
-      // Handle upload gambar baru
-      if (selectedImage && selectedImage !== content.fotoUrl) {
-        fileForUpload = await prepareFileForUpload(selectedImage);
+      try {
+        // Handle upload gambar baru
+        if (selectedImage && selectedImage !== content.fotoUrl) {
+          fileForUpload = await prepareFileForUpload(selectedImage);
+        }
+      } catch (imageError) {
+        console.error("Error saat memproses gambar:", imageError);
+        showErrorAlert(
+          imageError instanceof Error
+            ? imageError.message
+            : "Terjadi kesalahan saat memproses gambar. Silakan coba lagi."
+        );
+        setIsSubmitting(false);
+        return; // Stop execution if image processing fails
       }
 
       // Jika gambar dihapus, set undefined
@@ -208,27 +268,81 @@ export function ContentEdit({
         fileForUpload = undefined;
       }
 
-      // Panggil server action untuk update
-      await updateKontenWithOptionalFoto(
-        content.id,
-        updatedContent,
-        fileForUpload
-      );
-
-      showSuccessAlert();
-    } catch (error) {
-      console.error("Error saat update konten:", error);
-
-      if (
-        error instanceof Error &&
-        error.message === "Gagal memproses gambar"
-      ) {
-        showErrorAlert(
-          "Terjadi kesalahan saat memproses gambar. Silakan coba lagi."
+      try {
+        // Panggil server action untuk update
+        const updateResult = await updateKontenWithOptionalFoto(
+          content.id,
+          updatedContent,
+          fileForUpload
         );
-      } else {
-        showErrorAlert();
+
+        // If there are additional images, upload them after the main content is updated
+        if (additionalImages.length > 0) {
+          try {
+            // Import the uploadMultipleFotosKonten function
+            const { uploadMultipleFotosKonten } = await import("@/actions/content");
+
+            // Upload additional images
+            await uploadMultipleFotosKonten(content.id, additionalImages);
+
+            // Add a note about additional images in the success message
+            showSuccessAlert("Konten dan semua gambar berhasil diperbarui");
+          } catch (additionalImagesError) {
+            console.error("Error saat upload gambar tambahan:", additionalImagesError);
+
+            // Show success for the main content but warn about additional images
+            Swal.fire({
+              position: "center",
+              icon: "warning",
+              title: "Konten Berhasil Diperbarui",
+              text: "Konten berhasil disimpan, tetapi beberapa gambar tambahan gagal diunggah.",
+              showConfirmButton: true,
+              confirmButtonText: "OK",
+              showClass: {
+                popup: "animate__animated animate__zoomIn",
+              },
+              hideClass: {
+                popup: "animate__animated animate__zoomOut",
+              },
+              didClose: () => {
+                onSuccess();
+              },
+            });
+            return;
+          }
+        } else {
+          // No additional images, just show regular success
+          showSuccessAlert();
+        }
+      } catch (updateError) {
+        console.error("Error saat update konten:", updateError);
+
+        // Extract error message
+        let errorMessage = "Terjadi kesalahan saat menyimpan perubahan. Silakan coba lagi.";
+
+        if (updateError instanceof Error) {
+          // Check for specific error types
+          if (updateError.message.includes("Gagal memproses gambar")) {
+            errorMessage = "Terjadi kesalahan saat memproses gambar. Silakan coba lagi dengan gambar yang berbeda.";
+          } else if (updateError.message.includes("Ukuran file terlalu besar")) {
+            errorMessage = "Ukuran file gambar terlalu besar. Maksimal 2MB.";
+          } else if (updateError.message.includes("Format file tidak didukung")) {
+            errorMessage = "Format file tidak didukung. Hanya JPG, JPEG, dan PNG yang diperbolehkan.";
+          } else if (updateError.message.includes("<!DOCTYPE")) {
+            errorMessage = "Terjadi kesalahan pada server. Silakan coba lagi nanti.";
+          } else {
+            // Use the actual error message if available
+            errorMessage = updateError.message;
+          }
+        }
+
+        showErrorAlert(errorMessage);
       }
+    } catch (error) {
+      console.error("Error tidak terduga saat update konten:", error);
+      showErrorAlert(
+        "Terjadi kesalahan tidak terduga. Silakan coba lagi nanti."
+      );
     } finally {
       setIsSubmitting(false);
     }

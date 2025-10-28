@@ -1,6 +1,7 @@
 "use server";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { prisma } from "@/lib/prisma";
 
 export interface LaporanJumatMetadata {
   id?: string;
@@ -29,7 +30,7 @@ export interface LaporanJumatMetadata {
 export async function uploadLaporanJumatPDFAction(
   pdfBlob: Blob,
   metadata: Omit<LaporanJumatMetadata, 'id' | 'uploaded_at' | 'file_path' | 'file_size'>
-): Promise<{ success: boolean; data?: LaporanJumatMetadata; error?: string }> {
+): Promise<{ success: boolean; data?: any; error?: string } | null> {
   try {
     const supabase = supabaseAdmin;
     
@@ -60,34 +61,50 @@ export async function uploadLaporanJumatPDFAction(
       .from('reports')
       .getPublicUrl(filePath);
 
-    // Save metadata to database
-    const reportMetadata: Omit<LaporanJumatMetadata, 'id'> = {
-      ...metadata,
-      file_path: filePath,
-      file_size: pdfBlob.size,
-      uploaded_at: new Date().toISOString(),
-    };
+    try {
+      const insertDataPromise = prisma.laporanJumatFiles.create({
+        data: {
+          tanggal: new Date(metadata.tanggal),
+          judul: metadata.judul,
+          fileName: metadata.file_name,
+          filePath: filePath,
+          fileSize: BigInt(pdfBlob.size),
+          uploadedBy: metadata.uploaded_by,
+          isPublic: metadata.is_public,
+          saldoKasAwal: BigInt(metadata.saldo_kas_awal || 0),
+          totalPemasukan: BigInt(metadata.total_pemasukan || 0),
+          totalPengeluaran: BigInt(metadata.total_pengeluaran || 0),
+          saldoKasAkhir: BigInt(metadata.saldo_kas_akhir || 0),
+          khatib: metadata.khatib,
+          muadzdzin: metadata.muadzdzin,
+          imam: metadata.imam,
+          ketuaPengurus: metadata.ketua_pengurus,
+          bendahara: metadata.bendahara,
+        },
+      });
 
-    const { data: insertData, error: insertError } = await supabase
-      .from('laporan_jumat_files')
-      .insert(reportMetadata)
-      .select()
-      .single();
+      const insertData = await Promise.race([
+        insertDataPromise,
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Database operation timeout after 30 seconds')), 30000)
+        )
+      ]);
 
-    if (insertError) {
-      // If database insert fails, clean up uploaded file
+      return {
+        success: true,
+        data: {
+          ...insertData,
+          public_url: urlData.publicUrl
+        }
+      };
+    } catch (dbError) {
       await supabase.storage.from('reports').remove([filePath]);
-      console.error('Database insert error:', insertError);
-      return { success: false, error: `Gagal simpan metadata: ${insertError.message}` };
+      console.error('Database insert error:', dbError);
+      return { 
+        success: false, 
+        error: `Gagal simpan metadata: ${dbError instanceof Error ? dbError.message : 'Kesalahan tidak dikenal'}` 
+      };
     }
-
-    return {
-      success: true,
-      data: {
-        ...insertData,
-        public_url: urlData.publicUrl
-      } as LaporanJumatMetadata & { public_url: string }
-    };
 
   } catch (error) {
     console.error('Upload laporan error:', error);

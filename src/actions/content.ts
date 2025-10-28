@@ -60,7 +60,7 @@ export async function createKontenWithFoto(
       
       await createKontenBaruNotification(
         data.judul,
-        data.kategoriId?.toString() || "Artikel",
+        data.kategori || "Artikel",
         createdByName
       );
     } catch (notifError) {
@@ -458,14 +458,14 @@ export async function getTagsByKontenId(
 // ===== FILTER DAN PENCARIAN =====
 
 export async function getKontenByKategori(
-  kategoriId: number
+  kategori: string 
 ): Promise<KontenData[]> {
   try {
-    if (!kategoriId || kategoriId <= 0) {
-      throw new Error("ID kategori tidak valid");
+    if (!kategori) {
+      throw new Error("Kategori tidak boleh kosong");
     }
 
-    const data = await getKontenByKategoriService(kategoriId);
+    const data = await getKontenByKategoriService(kategori);
     return data;
   } catch (error) {
     console.error("Server Action - Error mengambil konten by kategori:", error);
@@ -550,7 +550,7 @@ interface PaginationResult {
 export async function getKontenWithPagination(
   page: number = 1,
   limit: number = 10,
-  kategoriId?: number,
+  kategori?: string,
   status?: string
 ): Promise<PaginationResult> {
   try {
@@ -563,7 +563,7 @@ export async function getKontenWithPagination(
     }
 
     // Gunakan getKontenForPublic untuk konten published tanpa filter kategori
-    if (status === "PUBLISHED" && !kategoriId) {
+    if (status === "PUBLISHED" && !kategori) {
       const offset = (page - 1) * limit;
       const data = await getKontenForPublicService(limit, offset);
 
@@ -586,8 +586,8 @@ export async function getKontenWithPagination(
     // Fallback untuk kasus lain
     let data: KontenData[];
 
-    if (kategoriId) {
-      data = await getKontenByKategoriService(kategoriId);
+    if (kategori) {
+      data = await getKontenByKategoriService(kategori);
     } else {
       data = await getKontenDataService();
     }

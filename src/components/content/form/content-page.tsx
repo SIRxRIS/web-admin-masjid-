@@ -20,9 +20,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ContentListItem } from "./types";
-import { 
-  KontenData, 
-  KontenDataWithTags, 
+import {
+  KontenData,
+  KontenDataWithTags,
   StatusKonten,
   kategoriKontenContoh,
   ContentFormValues,
@@ -50,9 +50,9 @@ interface ContentPageClientProps {
 
 const KATEGORI_OPTIONS = [
   { value: "all", label: "Semua Kategori" },
-  ...kategoriKontenContoh.map(kat => ({ 
-    value: kat.id.toString(), 
-    label: kat.label 
+  ...kategoriKontenContoh.map(kat => ({
+    value: String(kat.value),
+    label: kat.label
   }))
 ];
 
@@ -108,45 +108,54 @@ export function ContentPageClient({
   ) => {
     try {
       setIsLoading(true);
-      
+
       // Construct FormData for submission
       const formData = new FormData();
-      
+
       // Add basic form fields
       formData.append("judul", data.judul);
-      formData.append("kategoriId", data.kategoriId.toString());
-      formData.append("tanggal", data.tanggal.toISOString());
+      formData.append("kategori", String(data.kategori));
+
+      const tanggalValue = data.tanggal instanceof Date
+        ? data.tanggal
+        : new Date(data.tanggal);
+
+      if (Number.isNaN(tanggalValue.getTime())) {
+        throw new Error("Tanggal konten tidak valid. Pastikan format tanggal benar.");
+      }
+
+      formData.append("tanggal", tanggalValue.toISOString());
       formData.append("deskripsi", data.deskripsi);
       formData.append("status", data.status);
       formData.append("tags", JSON.stringify(data.tags || []));
-      
+
       // Add optional fields
       if (data.penulis) formData.append("penulis", data.penulis);
       if (data.waktu) formData.append("waktu", data.waktu);
       if (data.lokasi) formData.append("lokasi", data.lokasi);
       if (data.donaturId) formData.append("donaturId", data.donaturId.toString());
       if (data.kotakAmalId) formData.append("kotakAmalId", data.kotakAmalId.toString());
-      
+
       formData.append("tampilkanDiBeranda", data.tampilkanDiBeranda.toString());
       formData.append("penting", data.penting.toString());
-      
+
       // Add main file if exists
       if (fileUtama) {
         formData.append("file", fileUtama);
       }
-      
+
       // Add additional files
       additionalFiles.forEach((file) => {
         formData.append("files", file);
       });
-      
+
       const response = await fetch("/api/konten", {
         method: "POST",
         body: formData,
       });
-      
+
       const result = await response.json();
-      
+
       if (response.ok && result.success) {
         toast.success("Konten berhasil disimpan!");
         // Refresh content data
@@ -165,17 +174,17 @@ export function ContentPageClient({
 
   const toSchemaKonten = (c: ContentListItem): KontenData => {
     const validDate = toValidDate(c.tanggal) || new Date();
-    
+
     return {
       id: c.id,
       judul: c.judul,
-      slug: "", 
+      slug: "",
       deskripsi: c.deskripsi,
       tanggal: validDate,
       waktu: c.waktu || null,
       lokasi: null,
       penulis: c.penulis || null,
-      kategoriId: c.kategoriId,
+      kategori: c.kategori as any,
       donaturId: null,
       kotakAmalId: null,
       penting: c.penting,
@@ -203,10 +212,10 @@ export function ContentPageClient({
     return [...contents].sort((a, b) => {
       const dateA = toValidDate(a.tanggal);
       const dateB = toValidDate(b.tanggal);
-      
+
       if (!dateA || !dateB) return 0;
-      
-      return order === 'asc' 
+
+      return order === 'asc'
         ? dateA.getTime() - dateB.getTime()
         : dateB.getTime() - dateA.getTime();
     });
@@ -274,7 +283,7 @@ export function ContentPageClient({
             transition={{ duration: 0.3 }}
             className="space-y-8"
           >
-            
+
             {/* Search and Filters */}
             <motion.div
               initial={{ y: 20, opacity: 0 }}

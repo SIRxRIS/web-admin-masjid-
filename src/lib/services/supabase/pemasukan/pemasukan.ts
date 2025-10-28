@@ -419,117 +419,174 @@ export async function getAvailableTahunPemasukan(): Promise<number[]> {
 // Fungsi untuk statistik pemasukan
 export async function getStatistikPemasukan(tahun: number) {
   try {
-    const [totalBySumber] = await Promise.all([
-      getTotalPemasukanBySumber(tahun),
-    ]);
+    const monthNames = [
+      "jan",
+      "feb",
+      "mar",
+      "apr",
+      "mei",
+      "jun",
+      "jul",
+      "aug",
+      "sep",
+      "okt",
+      "nov",
+      "des",
+    ] as const;
+
+    const [donaturData, kotakAmalData, kotakMasjidData, kotakJumatData, donasiKhususData] =
+      await Promise.all([
+        supabaseAdmin
+          .from("Donatur")
+          .select("jan, feb, mar, apr, mei, jun, jul, aug, sep, okt, nov, des")
+          .eq("tahun", tahun),
+        supabaseAdmin
+          .from("KotakAmal")
+          .select("jan, feb, mar, apr, mei, jun, jul, aug, sep, okt, nov, des")
+          .eq("tahun", tahun),
+        supabaseAdmin
+          .from("KotakAmalMasjid")
+          .select("jumlah, tanggal")
+          .eq("tahun", tahun),
+        supabaseAdmin
+          .from("KotakAmalJumat")
+          .select("jumlah, tanggal")
+          .eq("tahun", tahun),
+        supabaseAdmin
+          .from("DonasiKhusus")
+          .select("jumlah, tanggal")
+          .eq("tahun", tahun),
+      ]);
+
+    const totalBySumber: Record<string, number> = {};
+
+    // Calculate total donatur
+    let totalDonatur = 0;
+    if (donaturData.data) {
+      totalDonatur = donaturData.data.reduce((sum, item) => {
+        return (
+          sum +
+          (item.jan || 0) +
+          (item.feb || 0) +
+          (item.mar || 0) +
+          (item.apr || 0) +
+          (item.mei || 0) +
+          (item.jun || 0) +
+          (item.jul || 0) +
+          (item.aug || 0) +
+          (item.sep || 0) +
+          (item.okt || 0) +
+          (item.nov || 0) +
+          (item.des || 0)
+        );
+      }, 0);
+      if (totalDonatur > 0) totalBySumber["DONATUR"] = totalDonatur;
+    }
+
+    // Calculate total kotak amal luar
+    let totalKotakAmal = 0;
+    if (kotakAmalData.data) {
+      totalKotakAmal = kotakAmalData.data.reduce((sum, item) => {
+        return (
+          sum +
+          (item.jan || 0) +
+          (item.feb || 0) +
+          (item.mar || 0) +
+          (item.apr || 0) +
+          (item.mei || 0) +
+          (item.jun || 0) +
+          (item.jul || 0) +
+          (item.aug || 0) +
+          (item.sep || 0) +
+          (item.okt || 0) +
+          (item.nov || 0) +
+          (item.des || 0)
+        );
+      }, 0);
+      if (totalKotakAmal > 0) totalBySumber["KOTAK_AMAL_LUAR"] = totalKotakAmal;
+    }
+
+    // Calculate totals from date-based sources
+    let totalKotakMasjid = 0;
+    if (kotakMasjidData.data) {
+      totalKotakMasjid = kotakMasjidData.data.reduce(
+        (sum, item) => sum + (item.jumlah || 0),
+        0,
+      );
+      if (totalKotakMasjid > 0) totalBySumber["KOTAK_AMAL_MASJID"] = totalKotakMasjid;
+    }
+
+    let totalKotakJumat = 0;
+    if (kotakJumatData.data) {
+      totalKotakJumat = kotakJumatData.data.reduce(
+        (sum, item) => sum + (item.jumlah || 0),
+        0,
+      );
+      if (totalKotakJumat > 0) totalBySumber["KOTAK_AMAL_JUMAT"] = totalKotakJumat;
+    }
+
+    let totalDonasiKhusus = 0;
+    if (donasiKhususData.data) {
+      totalDonasiKhusus = donasiKhususData.data.reduce(
+        (sum, item) => sum + (item.jumlah || 0),
+        0,
+      );
+      if (totalDonasiKhusus > 0) totalBySumber["DONASI_KHUSUS"] = totalDonasiKhusus;
+    }
 
     const totalTahunan = Object.values(totalBySumber).reduce(
       (sum, amount) => sum + amount,
       0,
     );
 
-    // Hitung data bulanan dari semua sumber
+    // Process monthly data in JavaScript
     const dataBulanan = [];
     for (let bulan = 1; bulan <= 12; bulan++) {
       let totalBulan = 0;
 
-      // Dari Donatur
-      const { data: donaturData } = await supabaseAdmin
-        .from("Donatur")
-        .select("jan, feb, mar, apr, mei, jun, jul, aug, sep, okt, nov, des")
-        .eq("tahun", tahun);
+      const monthKey = monthNames[bulan - 1];
 
-      if (donaturData) {
-        const monthNames = [
-          "jan",
-          "feb",
-          "mar",
-          "apr",
-          "mei",
-          "jun",
-          "jul",
-          "aug",
-          "sep",
-          "okt",
-          "nov",
-          "des",
-        ] as const;
-        const monthKey = monthNames[bulan - 1];
-
-        donaturData.forEach((donatur) => {
+      // From static month fields
+      if (donaturData.data) {
+        donaturData.data.forEach((donatur) => {
           totalBulan += donatur[monthKey] || 0;
         });
       }
 
-      // Dari KotakAmal
-      const { data: kotakAmalData } = await supabaseAdmin
-        .from("KotakAmal")
-        .select("jan, feb, mar, apr, mei, jun, jul, aug, sep, okt, nov, des")
-        .eq("tahun", tahun);
-
-      if (kotakAmalData) {
-        const monthNames = [
-          "jan",
-          "feb",
-          "mar",
-          "apr",
-          "mei",
-          "jun",
-          "jul",
-          "aug",
-          "sep",
-          "okt",
-          "nov",
-          "des",
-        ] as const;
-        const monthKey = monthNames[bulan - 1];
-
-        kotakAmalData.forEach((kotak) => {
+      if (kotakAmalData.data) {
+        kotakAmalData.data.forEach((kotak) => {
           totalBulan += kotak[monthKey] || 0;
         });
       }
 
-      // Dari KotakAmalMasjid, KotakAmalJumat dan DonasiKhusus (berdasarkan tanggal)
-      const startDate = new Date(tahun, bulan - 1, 1);
-      const endDate = new Date(tahun, bulan, 0);
-
-      const [kotakMasjidData, kotakJumatData, donasiKhususData] =
-        await Promise.all([
-          supabaseAdmin
-            .from("KotakAmalMasjid")
-            .select("jumlah")
-            .eq("tahun", tahun)
-            .gte("tanggal", startDate.toISOString().split("T")[0])
-            .lte("tanggal", endDate.toISOString().split("T")[0]),
-          supabaseAdmin
-            .from("KotakAmalJumat")
-            .select("jumlah")
-            .eq("tahun", tahun)
-            .gte("tanggal", startDate.toISOString().split("T")[0])
-            .lte("tanggal", endDate.toISOString().split("T")[0]),
-          supabaseAdmin
-            .from("DonasiKhusus")
-            .select("jumlah")
-            .eq("tahun", tahun)
-            .gte("tanggal", startDate.toISOString().split("T")[0])
-            .lte("tanggal", endDate.toISOString().split("T")[0]),
-        ]);
+      // From date fields
+      const startDay = 1;
+      const endDay = new Date(tahun, bulan, 0).getDate();
 
       if (kotakMasjidData.data) {
         kotakMasjidData.data.forEach((item) => {
-          totalBulan += item.jumlah || 0;
+          const date = new Date(item.tanggal);
+          if (date.getMonth() === bulan - 1) {
+            totalBulan += item.jumlah || 0;
+          }
         });
       }
 
       if (kotakJumatData.data) {
         kotakJumatData.data.forEach((item) => {
-          totalBulan += item.jumlah || 0;
+          const date = new Date(item.tanggal);
+          if (date.getMonth() === bulan - 1) {
+            totalBulan += item.jumlah || 0;
+          }
         });
       }
 
       if (donasiKhususData.data) {
         donasiKhususData.data.forEach((item) => {
-          totalBulan += item.jumlah || 0;
+          const date = new Date(item.tanggal);
+          if (date.getMonth() === bulan - 1) {
+            totalBulan += item.jumlah || 0;
+          }
         });
       }
 

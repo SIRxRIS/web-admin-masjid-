@@ -26,7 +26,7 @@ model EmailWhitelist {
 }
 
 model Profile {
-  id                  String  @id @default(uuid()) @db.Uuid
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId              String  @unique
   nama                String
   jabatan             Jabatan
@@ -74,11 +74,11 @@ enum Role {
 }
 
 model UserActivity {
-  id        String   @id @default(uuid())
+  id        String   @id @default(uuid()) @db.Uuid
   profileId String   @db.Uuid
   profile   Profile  @relation(fields: [profileId], references: [id])
-  action    String // LOGIN, LOGOUT, UPDATE_PROFILE, dll
-  details   Json? // Detail tambahan
+  action    String
+  details   Json?
   ipAddress String?
   userAgent String?
   createdAt DateTime @default(now())
@@ -212,19 +212,17 @@ model Pengurus {
   updatedAt DateTime @default(now())
 }
 
-// Model untuk kategori konten
-model KategoriKonten {
-  id        Int      @id @default(autoincrement())
-  nama      String   @unique
-  label     String
-  slug      String   @unique
-  deskripsi String?
-  warna     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now())
-  konten    Konten[]
-
-  @@map("kategori_konten")
+// Enum untuk kategori konten (menggantikan tabel kategori_konten)
+enum KategoriKontenEnum {
+  KEGIATAN_MASJID
+  PENGUMUMAN
+  KAJIAN_RUTIN
+  KEGIATAN_TPQ_TPA
+  LOMBA_ACARA
+  RAMADHAN
+  IDUL_FITRI
+  IDUL_ADHA
+  BAKTI_SOSIAL
 }
 
 // Model utama untuk konten masjid
@@ -237,7 +235,7 @@ model Konten {
   waktu              String?
   lokasi             String?
   penulis            String?
-  kategoriId         Int
+  kategori           KategoriKontenEnum
   donaturId          Int?
   kotakAmalId        Int?
   penting            Boolean      @default(false)
@@ -248,8 +246,9 @@ model Konten {
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @default(now())
 
-  // Relasi
-  kategori   KategoriKonten    @relation(fields: [kategoriId], references: [id])
+  // Kategori sekarang disimpan sebagai enum `KategoriKontenEnum`.
+  // Jika Anda membutuhkan relasi dinamis dengan tabel kategori, pertimbangkan
+  // untuk tetap menggunakan `KategoriKonten` model dan foreign key.
   donatur    Donatur?          @relation(fields: [donaturId], references: [id])
   kotakAmal  KotakAmal?        @relation(fields: [kotakAmalId], references: [id])
   gambar     GambarKonten[]
@@ -397,6 +396,34 @@ model programkerja {
   @@index([kategori, seksi])
 }
 
+model LaporanJumatFiles {
+  id              String   @id @default(uuid()) @db.Uuid
+  tanggal         DateTime @db.Timestamp(3)
+  judul           String
+  fileName        String   @map("file_name")
+  filePath        String   @map("file_path")
+  fileSize        BigInt   @map("file_size")
+  isPublic        Boolean  @default(false) @map("is_public")
+  uploadedBy      String?  @map("uploaded_by")
+  uploadedAt      DateTime @default(now()) @map("uploaded_at") @db.Timestamp(3)
+  saldoKasAwal    BigInt   @map("saldo_kas_awal")
+  totalPemasukan  BigInt   @map("total_pemasukan")
+  totalPengeluaran BigInt  @map("total_pengeluaran")
+  saldoKasAkhir   BigInt   @map("saldo_kas_akhir")
+  khatib          String?
+  muadzdzin       String?
+  imam            String?
+  ketuaPengurus   String?  @map("ketua_pengurus")
+  bendahara       String?
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamp(3)
+  updatedAt       DateTime @default(now()) @map("updated_at") @db.Timestamp(3)
+
+  @@index([tanggal])
+  @@index([isPublic])
+  @@index([uploadedAt])
+  @@map("laporan_jumat_files")
+}
+
 model SiteConfiguration {
   id          String   @id @default(uuid()) @db.Uuid
   key         String   @unique
@@ -479,4 +506,16 @@ enum NotificationPriority {
   MEDIUM
   HIGH
   URGENT
+}
+
+// Model untuk menyimpan data pengunjung harian dari Cloudflare
+model DailyVisitorData {
+  id        Int      @id @default(autoincrement())
+  date      DateTime @unique
+  visitors  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([date])
+  @@map("daily_visitor_data")
 }

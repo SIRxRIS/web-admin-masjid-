@@ -59,20 +59,20 @@ interface ContentGalleryProps {
 }
 
 const KATEGORI_CONFIG = {
-  1: { label: "Kegiatan Masjid", color: "bg-blue-500 text-blue-50" },
-  2: { label: "Pengumuman", color: "bg-purple-500 text-purple-50" },
-  3: { label: "Kajian Rutin", color: "bg-green-500 text-green-50" },
-  4: { label: "Kegiatan TPQ/TPA", color: "bg-yellow-500 text-yellow-50" },
-  5: { label: "Lomba dan Acara", color: "bg-pink-500 text-pink-50" },
-  6: { label: "Program Ramadhan", color: "bg-indigo-500 text-indigo-50" },
-  7: { label: "Idul Fitri", color: "bg-teal-500 text-teal-50" },
-  8: { label: "Idul Adha", color: "bg-orange-500 text-orange-50" },
-  9: { label: "Bakti Sosial", color: "bg-red-500 text-red-50" },
+  KEGIATAN_MASJID: { label: "Kegiatan Masjid", color: "bg-blue-500 text-blue-50" },
+  PENGUMUMAN: { label: "Pengumuman", color: "bg-purple-500 text-purple-50" },
+  KAJIAN_RUTIN: { label: "Kajian Rutin", color: "bg-green-500 text-green-50" },
+  KEGIATAN_TPQ_TPA: { label: "Kegiatan TPQ/TPA", color: "bg-yellow-500 text-yellow-50" },
+  LOMBA_DAN_ACARA: { label: "Lomba dan Acara", color: "bg-pink-500 text-pink-50" },
+  PROGRAM_RAMADHAN: { label: "Program Ramadhan", color: "bg-indigo-500 text-indigo-50" },
+  IDUL_FITRI: { label: "Idul Fitri", color: "bg-teal-500 text-teal-50" },
+  IDUL_ADHA: { label: "Idul Adha", color: "bg-orange-500 text-orange-50" },
+  BAKTI_SOSIAL: { label: "Bakti Sosial", color: "bg-red-500 text-red-50" },
 } as const;
 
-const getKategoriInfo = (kategoriId: number) => {
+const getKategoriInfo = (kategori: string) => {
   return (
-    KATEGORI_CONFIG[kategoriId as keyof typeof KATEGORI_CONFIG] || {
+    (KATEGORI_CONFIG as any)[kategori] || {
       label: "Lainnya",
       color: "bg-gray-500 text-gray-50",
     }
@@ -92,7 +92,7 @@ const ContentCard = ({
   onDelete: (id: string) => void;
   index: number;
 }) => {
-  const kategoriInfo = getKategoriInfo(content.kategoriId);
+  const kategoriInfo = getKategoriInfo(content.kategori);
 
   return (
     <motion.div
@@ -170,7 +170,7 @@ const ContentCard = ({
             onClick={() => onEditContent(content)}
           >
             <Edit className="mr-2 h-4 w-4" />
-            Edit
+            Edit Konten
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
@@ -288,7 +288,7 @@ export function ContentGallery({
 
       const matchesCategory =
         kategoriFilter === "all" ||
-        content.kategoriId.toString() === kategoriFilter;
+        String(content.kategori) === kategoriFilter;
 
       return matchesSearch && matchesCategory;
     });

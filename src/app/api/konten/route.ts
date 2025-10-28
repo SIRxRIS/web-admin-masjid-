@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
 
     // Extract data dari formData
     const judul = formData.get("judul") as string;
-    const kategoriId = parseInt(formData.get("kategoriId") as string);
+  const kategori = formData.get("kategori") as string;
     const tanggal = formData.get("tanggal") as string;
     const deskripsi = formData.get("deskripsi") as string;
     const penulis = formData.get("penulis") as string || null;
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Validasi data
-    if (!judul || !deskripsi || !tanggal || isNaN(kategoriId)) {
+    if (!judul || !deskripsi || !tanggal || !kategori) {
       return NextResponse.json(
         { error: "Data tidak lengkap" },
         { status: 400 }
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
 
     const kontenData = {
       judul,
-      kategoriId,
+      kategori,
       tanggal: new Date(tanggal),
       deskripsi,
       penulis,
@@ -116,7 +116,7 @@ export async function GET(request: NextRequest) {
     let filteredData = data;
 
     if (kategori && kategori !== "all") {
-      filteredData = filteredData.filter(item => item.kategoriId === parseInt(kategori));
+      filteredData = filteredData.filter(item => String(item.kategori) === kategori);
     }
 
     if (status && status !== "all") {
@@ -153,7 +153,7 @@ export async function PUT(request: NextRequest) {
     // Ekstrak field optional
     const updates: any = {};
     const fields = [
-      "judul","kategoriId","tanggal","deskripsi","penulis","waktu","lokasi",
+      "judul","kategori","tanggal","deskripsi","penulis","waktu","lokasi",
       "donaturId","kotakAmalId","tampilkanDiBeranda","penting","status","tags","slug"
     ];
     fields.forEach((key) => {
@@ -162,7 +162,7 @@ export async function PUT(request: NextRequest) {
     });
 
     // Normalisasi tipe
-    if (updates.kategoriId) updates.kategoriId = parseInt(updates.kategoriId);
+  // kategori is a string enum, no numeric parsing required
     if (updates.tanggal) updates.tanggal = new Date(updates.tanggal);
     if (updates.donaturId) updates.donaturId = parseInt(updates.donaturId);
     if (updates.kotakAmalId) updates.kotakAmalId = parseInt(updates.kotakAmalId);
